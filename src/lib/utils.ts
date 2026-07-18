@@ -6,8 +6,9 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // ─── Format Naira ─────────────────────────────────────
-export function formatNaira(amount: number): string {
-  return '₦' + amount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+export function formatNaira(amount: number | undefined | null): string {
+  const safeAmount = amount ?? 0;
+  return '₦' + safeAmount.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 }
 
 // ─── Generate Order Number ────────────────────────────

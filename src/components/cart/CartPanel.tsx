@@ -22,9 +22,10 @@ import {
   CheckCircle,
   Store,
   AlertTriangle,
+  UserCircle,
 } from "lucide-react";
 import { formatNaira } from "@/lib/utils";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { signIn } from "next-auth/react";
 
@@ -46,7 +47,7 @@ export function CheckoutPanel() {
     getPerRestaurantSubtotal,
     getPerRestaurantDeliveryFee,
   } = useCartStore();
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { setShowLogin } = useUIStore();
   const router = useRouter();
   const [isCheckout, setIsCheckout] = useState(false);
@@ -54,6 +55,7 @@ export function CheckoutPanel() {
     "PAYSTACK",
   );
   const [loading, setLoading] = useState(false);
+  const [profileLoaded, setProfileLoaded] = useState(false);
   const [form, setForm] = useState({
     customerName: "",
     customerPhone: "",
@@ -139,6 +141,50 @@ export function CheckoutPanel() {
   const groups = getGroupedByRestaurant();
   const restaurantCount = getRestaurantCount();
 
+  // Auto-fill from user profile when authenticated
+  // Use a ref to avoid calling setState in effect
+  const [autoFilledFromSession, setAutoFilledFromSession] = useState(false);
+
+  if (isAuthenticated && user && !autoFilledFromSession && !profileLoaded) {
+    const sessionName = user.name || "";
+    const sessionPhone = (user as any)?.phone || "";
+    const sessionAddress = (user as any)?.address || "";
+    const sessionCity = (user as any)?.city || "";
+    const sessionState = (user as any)?.state || "";
+    if (sessionName || sessionPhone || sessionAddress) {
+      setForm((prev) => ({
+        ...prev,
+        customerName: sessionName || prev.customerName,
+        customerPhone: sessionPhone || prev.customerPhone,
+        deliveryAddress: sessionAddress || prev.deliveryAddress,
+        deliveryCity: sessionCity || prev.deliveryCity,
+        deliveryState: sessionState || prev.deliveryState,
+      }));
+      setProfileLoaded(true);
+    }
+    setAutoFilledFromSession(true);
+  }
+
+  const handleAutoFill = async () => {
+    try {
+      const res = await fetch("/api/profile");
+      const d = await res.json();
+      if (d.data) {
+        setForm((prev) => ({
+          ...prev,
+          customerName: d.data.name || prev.customerName,
+          customerPhone: d.data.phone || prev.customerPhone,
+          deliveryAddress: d.data.address || prev.deliveryAddress,
+          deliveryCity: d.data.city || prev.deliveryCity,
+          deliveryState: d.data.state || prev.deliveryState,
+        }));
+        toast.success("Details auto-filled from your profile");
+      }
+    } catch {
+      toast.error("Could not fetch profile details");
+    }
+  };
+
   const handleCheckout = async () => {
     if (!isAuthenticated) {
       setShowLogin(true);
@@ -162,6 +208,7 @@ export function CheckoutPanel() {
 
     setLoading(true);
     try {
+      // Step 1: Create the order first
       const orderItems = items.map((item) => ({
         foodId: item.foodId,
         quantity: item.quantity,
@@ -186,15 +233,52 @@ export function CheckoutPanel() {
         return;
       }
 
-      // If Paystack, initialize payment
-      if (paymentMethod === "PAYSTACK" && data.data?.paystackUrl) {
-        clearCart();
-        closeCart();
-        window.location.href = data.data.paystackUrl;
-        return;
+      const orderId = data.data?.id;
+      const totalAmount = data.data?.totalAmount;
+
+      // Step 2: If Paystack, initialize payment
+      if (paymentMethod === "PAYSTACK" && orderId && totalAmount) {
+        try {
+          const payRes = await fetch("/api/paystack/initialize", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              orderId,
+              email: user?.email,
+              amount: totalAmount,
+            }),
+          });
+          const payData = await payRes.json();
+
+          if (payRes.ok && payData.data?.authorizationUrl) {
+            clearCart();
+            closeCart();
+            // Redirect to Paystack payment page
+            window.location.href = payData.data.authorizationUrl;
+            return;
+          } else {
+            // Paystack init failed — fall back to COD
+            toast.error(
+              payData.error ||
+                "Payment initialization failed. Order placed as COD.",
+            );
+            clearCart();
+            closeCart();
+            setIsCheckout(false);
+            router.push("/orders");
+            return;
+          }
+        } catch (payErr) {
+          toast.error("Payment service unavailable. Order placed as COD.");
+          clearCart();
+          closeCart();
+          setIsCheckout(false);
+          router.push("/orders");
+          return;
+        }
       }
 
-      // COD or success
+      // COD success
       clearCart();
       closeCart();
       setIsCheckout(false);
@@ -211,24 +295,34 @@ export function CheckoutPanel() {
       setShowLogin(true);
       return;
     }
-    // Pre-fill from profile if available
-    fetch("/api/profile")
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.data) {
-          setForm((prev) => ({
-            ...prev,
-            customerName: d.data.name || prev.customerName,
-            customerPhone: d.data.phone || prev.customerPhone,
-            deliveryAddress: d.data.address || prev.deliveryAddress,
-            deliveryCity: d.data.city || prev.deliveryCity,
-            deliveryState: d.data.state || prev.deliveryState,
-          }));
-        }
-      })
-      .catch(() => {});
+    // Pre-fill from profile API if not already loaded
+    if (!profileLoaded) {
+      fetch("/api/profile")
+        .then((r) => r.json())
+        .then((d) => {
+          if (d.data) {
+            setForm((prev) => ({
+              ...prev,
+              customerName: d.data.name || prev.customerName,
+              customerPhone: d.data.phone || prev.customerPhone,
+              deliveryAddress: d.data.address || prev.deliveryAddress,
+              deliveryCity: d.data.city || prev.deliveryCity,
+              deliveryState: d.data.state || prev.deliveryState,
+            }));
+            setProfileLoaded(true);
+          }
+        })
+        .catch(() => {});
+    }
     setIsCheckout(true);
   };
+
+  // Check if form has any user data
+  const hasProfileData = !!(
+    form.customerName ||
+    form.customerPhone ||
+    form.deliveryAddress
+  );
 
   return (
     <AnimatePresence>
@@ -340,7 +434,7 @@ export function CheckoutPanel() {
                               {group.items.map((item) => (
                                 <div
                                   key={item.foodId}
-                                  className=" rounded-lg p-3 flex items-center gap-3"
+                                  className="bg-gray-700 rounded-lg p-3 flex items-center gap-3"
                                 >
                                   {item.foodImage ? (
                                     <img
@@ -369,7 +463,7 @@ export function CheckoutPanel() {
                                       onClick={() =>
                                         decrementQuantity(item.foodId)
                                       }
-                                      className="w-6 h-6  rounded text-white flex items-center justify-center hover:bg-gray-500"
+                                      className="w-6 h-6 bg-gray-600 rounded text-white flex items-center justify-center hover:bg-gray-500"
                                     >
                                       <Minus className="w-3 h-3" />
                                     </button>
@@ -380,7 +474,7 @@ export function CheckoutPanel() {
                                       onClick={() =>
                                         incrementQuantity(item.foodId)
                                       }
-                                      className="w-6 h-6  rounded text-white flex items-center justify-center hover:bg-gray-500"
+                                      className="w-6 h-6 bg-gray-600 rounded text-white flex items-center justify-center hover:bg-gray-500"
                                     >
                                       <Plus className="w-3 h-3" />
                                     </button>
@@ -500,9 +594,20 @@ export function CheckoutPanel() {
 
                   {/* Delivery Info */}
                   <div>
-                    <h3 className="font-semibold text-gray-900 mb-3">
-                      Delivery Information
-                    </h3>
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="font-semibold text-gray-900">
+                        Delivery Information
+                      </h3>
+                      {isAuthenticated && (
+                        <button
+                          onClick={handleAutoFill}
+                          className="flex items-center gap-1.5 text-sm text-primary hover:text-orange-700 font-medium transition-colors"
+                        >
+                          <UserCircle className="w-4 h-4" />
+                          Auto-fill from Profile
+                        </button>
+                      )}
+                    </div>
                     <div className="space-y-3">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -515,6 +620,9 @@ export function CheckoutPanel() {
                             setField("customerName", e.target.value)
                           }
                           className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"
+                          placeholder={
+                            isAuthenticated ? "" : "Sign in to auto-fill"
+                          }
                         />
                       </div>
                       <div>

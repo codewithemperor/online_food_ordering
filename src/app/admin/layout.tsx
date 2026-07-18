@@ -2,10 +2,15 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter, usePathname } from 'next/navigation';
-import { LayoutDashboard, Store, Tag, UtensilsCrossed, ShoppingCart, Users, DollarSign, UserCheck, ArrowLeft, LogOut, XCircle } from 'lucide-react';
+import { LayoutDashboard, Store, Tag, UtensilsCrossed, ShoppingCart, Users, DollarSign, UserCheck, ArrowLeft, LogOut, XCircle, ShieldCheck, RefreshCw } from 'lucide-react';
 import { signOut } from 'next-auth/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
+import toast from 'react-hot-toast';
+import { Card, CardContent } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 
 const adminNav = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -17,6 +22,68 @@ const adminNav = [
   { href: '/admin/earnings', label: 'Earnings', icon: DollarSign },
   { href: '/admin/owners', label: 'Owners', icon: UserCheck },
 ];
+
+// ─── Admin Login Form ─────────────────────────────────────────
+function AdminLoginForm() {
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { signIn } = await import('next-auth/react');
+      const result = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      });
+      if (result?.error) {
+        toast.error('Invalid email or password');
+      } else {
+        toast.success('Logged in successfully');
+        window.location.reload();
+      }
+    } catch {
+      toast.error('Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md rounded-xl shadow-lg">
+        <CardContent className="pt-8 text-center">
+          <div className="mx-auto h-12 w-12 rounded-full bg-orange-500 flex items-center justify-center mb-2">
+            <ShieldCheck className="h-6 w-6 text-white" />
+          </div>
+          <h1 className="text-xl font-bold mb-1">NaijaBites Admin</h1>
+          <p className="text-sm text-gray-500 mb-6">Sign in to manage the platform</p>
+        </CardContent>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label>Email</Label>
+              <Input type="email" placeholder="admin@naijabites.ng" value={email} onChange={(e) => setEmail(e.target.value)} required />
+            </div>
+            <div className="space-y-2">
+              <Label>Password</Label>
+              <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+            </div>
+            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600 text-white" disabled={loading}>
+              {loading ? 'Signing in...' : 'Sign In'}
+            </Button>
+          </form>
+          <p className="text-xs text-gray-400 text-center mt-4">
+            Admin access only. <button onClick={() => window.location.href = '/'} className="text-orange-500 hover:underline">Back to Store</button>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const { data: session, status } = useSession();
@@ -38,18 +105,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Not authenticated
   if (status === 'unauthenticated') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center max-w-md mx-auto px-4">
-          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-600 mb-2">Authentication Required</h2>
-          <p className="text-gray-400 text-sm mb-6">You need to be logged in as an admin to access this page</p>
-          <button onClick={() => router.push('/')} className="px-6 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium">
-            Go to Login
-          </button>
-        </div>
-      </div>
-    );
+    return <AdminLoginForm />;
   }
 
   // Authenticated but not ADMIN
@@ -60,9 +116,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-600 mb-2">Access Denied</h2>
           <p className="text-gray-400 text-sm mb-6">You need admin access to view this page</p>
-          <button onClick={() => router.push('/')} className="px-6 py-2.5 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors font-medium">
-            Back to Store
-          </button>
+          <div className="flex gap-3 justify-center">
+            <button onClick={() => signOut({ callbackUrl: '/' })} className="px-6 py-2.5 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors font-medium">
+              Sign Out
+            </button>
+            <button onClick={() => router.push('/')} className="px-6 py-2.5 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors font-medium">
+              Back to Store
+            </button>
+          </div>
         </div>
       </div>
     );

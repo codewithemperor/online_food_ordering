@@ -1,0 +1,602 @@
+     1→'use client';
+     2→
+     3→import { LayoutDashboard, Store, Tag, UtensilsCrossed, ShoppingCart, Users, DollarSign, Plus, Edit, Trash2, Search, X, CheckCircle, XCircle, Clock, Eye, UserCheck, ArrowLeft } from 'lucide-react';
+     4→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+     5→import { formatNaira, getStatusColor } from '@/lib/utils';
+     6→import { useState } from 'react';
+     7→import toast from 'react-hot-toast';
+     8→
+     9→// ─── SHARED ──────────────────────────
+    10→
+    11→export function StatusBadge({ status }: { status: string }) {
+    12→  const colors = getStatusColor(status);
+    13→  return <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>{status.replace(/_/g, ' ')}</span>;
+    14→}
+    15→
+    16→export function handleUpload(setForm: React.Dispatch<React.SetStateAction<any>>) {
+    17→  return async (e: any) => {
+    18→    const file = e.target.files[0];
+    19→    if (!file) return;
+    20→    const fd = new FormData();
+    21→    fd.append('file', file);
+    22→    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    23→    const data = await res.json();
+    24→    if (data.data?.url) setForm((p: any) => ({ ...p, image: data.data.url }));
+    25→  };
+    26→}
+    27→
+    28→// ─── DASHBOARD ──────────────────────────
+    29→
+    30→export function AdminDashboard() {
+    31→  const { data: stats, isLoading } = useQuery({
+    32→    queryKey: ['dashboard-stats'],
+    33→    queryFn: () => fetch('/api/dashboard/stats').then(r => r.json()).then(d => d.data),
+    34→  });
+    35→
+    36→  const statCards = [
+    37→    { label: 'Restaurants', value: stats?.totalRestaurants || 0, icon: Store, color: 'text-orange-500 bg-orange-50', border: 'border-l-orange-500' },
+    38→    { label: 'Food Items', value: stats?.totalFoods || 0, icon: UtensilsCrossed, color: 'text-blue-500 bg-blue-50', border: 'border-l-blue-500' },
+    39→    { label: 'Customers', value: stats?.totalCustomers || 0, icon: Users, color: 'text-green-500 bg-green-50', border: 'border-l-green-500' },
+    40→    { label: 'Total Orders', value: stats?.totalOrders || 0, icon: ShoppingCart, color: 'text-purple-500 bg-purple-50', border: 'border-l-purple-500' },
+    41→    { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock, color: 'text-yellow-500 bg-yellow-50', border: 'border-l-yellow-500' },
+    42→    { label: "Today's Orders", value: stats?.todayOrders || 0, icon: LayoutDashboard, color: 'text-indigo-500 bg-indigo-50', border: 'border-l-indigo-500' },
+    43→    { label: 'Total Earnings', value: formatNaira(stats?.totalEarnings || 0), icon: DollarSign, color: 'text-emerald-500 bg-emerald-50', border: 'border-l-emerald-500' },
+    44→    { label: 'Cancelled', value: stats?.cancelledOrders || 0, icon: XCircle, color: 'text-red-500 bg-red-50', border: 'border-l-red-500' },
+    45→  ];
+    46→
+    47→  return (
+    48→    <div>
+    49→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
+    50→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    51→        {isLoading ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="bg-white rounded-xl p-6 animate-pulse border-l-4 border-gray-200"><div className="h-10 bg-gray-100 rounded mb-2" /><div className="h-4 bg-gray-100 rounded w-1/2" /></div>)
+    52→        : statCards.map((card, i) => (
+    53→          <div key={i} className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${card.border}`}>
+    54→            <div className={`w-12 h-12 rounded-lg ${card.color} flex items-center justify-center mb-3`}><card.icon className="w-6 h-6" /></div>
+    55→            <p className="text-sm text-gray-500">{card.label}</p>
+    56→            <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+    57→          </div>
+    58→        ))}
+    59→      </div>
+    60→    </div>
+    61→  );
+    62→}
+    63→
+    64→// ─── CATEGORIES ──────────────────────────
+    65→
+    66→export function AdminCategories() {
+    67→  const qc = useQueryClient();
+    68→  const [showForm, setShowForm] = useState(false);
+    69→  const [editItem, setEditItem] = useState<any>(null);
+    70→  const [form, setForm] = useState({ name: '', description: '', image: '' });
+    71→
+    72→  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => fetch('/api/categories').then(r => r.json()).then(d => d.data || []) });
+    73→
+    74→  const saveMutation = useMutation({
+    75→    mutationFn: (data: any) => fetch('/api/categories', { method: editItem ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editItem ? { ...data, id: editItem.id } : data) }).then(r => r.json()),
+    76→    onSuccess: () => { toast.success(editItem ? 'Category updated' : 'Category created'); setShowForm(false); setEditItem(null); setForm({ name: '', description: '', image: '' }); qc.invalidateQueries({ queryKey: ['categories'] }); },
+    77→    onError: () => toast.error('Failed to save category'),
+    78→  });
+    79→
+    80→  const deleteMutation = useMutation({
+    81→    mutationFn: (id: string) => fetch(`/api/categories?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+    82→    onSuccess: () => { toast.success('Category deleted'); qc.invalidateQueries({ queryKey: ['categories'] }); },
+    83→    onError: () => toast.error('Failed to delete'),
+    84→  });
+    85→
+    86→  const handleEdit = (cat: any) => { setEditItem(cat); setForm({ name: cat.name, description: cat.description || '', image: cat.image || '' }); setShowForm(true); };
+    87→  const onUpload = handleUpload(setForm);
+    88→
+    89→  return (
+    90→    <div>
+    91→      <div className="flex justify-between items-center mb-6">
+    92→        <h2 className="text-2xl font-bold text-gray-900">Categories</h2>
+    93→        <button onClick={() => { setEditItem(null); setForm({ name: '', description: '', image: '' }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors"><Plus className="w-4 h-4" /> Add Category</button>
+    94→      </div>
+    95→
+    96→      {showForm && (
+    97→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+    98→          <h3 className="font-semibold text-lg mb-4">{editItem ? 'Edit Category' : 'New Category'}</h3>
+    99→          <div className="space-y-4">
+   100→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Name</label><input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   101→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   102→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Image</label><input type="file" accept="image/*" onChange={onUpload} className="w-full" />{form.image && <img src={form.image} alt="Preview" className="w-20 h-20 rounded-lg mt-2 object-cover" />}</div>
+   103→            <div className="flex gap-3"><button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{saveMutation.isPending ? 'Saving...' : 'Save'}</button><button onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button></div>
+   104→          </div>
+   105→        </div>
+   106→      )}
+   107→
+   108→      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+   109→        {categories.map((cat: any) => (
+   110→          <div key={cat.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100">
+   111→            <div className="h-32 bg-gray-100 relative">{cat.image ? <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Tag className="w-8 h-8 text-gray-400" /></div>}</div>
+   112→            <div className="p-4">
+   113→              <h3 className="font-semibold text-gray-900">{cat.name}</h3>
+   114→              {cat.description && <p className="text-sm text-gray-500 mt-1">{cat.description}</p>}
+   115→              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+   116→                <button onClick={() => handleEdit(cat)} className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Edit className="w-3.5 h-3.5" /> Edit</button>
+   117→                <button onClick={() => confirm('Delete this category?') && deleteMutation.mutate(cat.id)} className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+   118→              </div>
+   119→            </div>
+   120→          </div>
+   121→        ))}
+   122→      </div>
+   123→    </div>
+   124→  );
+   125→}
+   126→
+   127→// ─── RESTAURANTS ──────────────────────────
+   128→
+   129→export function AdminRestaurants() {
+   130→  const qc = useQueryClient();
+   131→  const [showForm, setShowForm] = useState(false);
+   132→  const [editItem, setEditItem] = useState<any>(null);
+   133→  const [form, setForm] = useState({ name: '', description: '', email: '', phone: '', address: '', city: '', state: '', openTime: '', closeTime: '', openDays: '', image: '', categoryId: '', isActive: true });
+   134→
+   135→  const { data: restaurants = [] } = useQuery({ queryKey: ['restaurants-admin'], queryFn: () => fetch('/api/restaurants').then(r => r.json()).then(d => d.data || []) });
+   136→  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => fetch('/api/categories').then(r => r.json()).then(d => d.data || []) });
+   137→
+   138→  const saveMutation = useMutation({
+   139→    mutationFn: (data: any) => fetch('/api/restaurants', { method: editItem ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editItem ? { ...data, id: editItem.id } : data) }).then(r => r.json()),
+   140→    onSuccess: () => { toast.success(editItem ? 'Restaurant updated' : 'Restaurant created'); setShowForm(false); setEditItem(null); qc.invalidateQueries({ queryKey: ['restaurants-admin'] }); },
+   141→    onError: () => toast.error('Failed to save'),
+   142→  });
+   143→
+   144→  const deleteMutation = useMutation({
+   145→    mutationFn: (id: string) => fetch(`/api/restaurants?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+   146→    onSuccess: () => { toast.success('Restaurant deleted'); qc.invalidateQueries({ queryKey: ['restaurants-admin'] }); },
+   147→  });
+   148→
+   149→  const handleEdit = (r: any) => { setEditItem(r); setForm({ name: r.name, description: r.description || '', email: r.email || '', phone: r.phone || '', address: r.address || '', city: r.city || '', state: r.state || '', openTime: r.openTime || '', closeTime: r.closeTime || '', openDays: r.openDays || '', image: r.image || '', categoryId: r.categoryId || r.category?.id || '', isActive: r.isActive }); setShowForm(true); };
+   150→  const onUpload = handleUpload(setForm);
+   151→
+   152→  return (
+   153→    <div>
+   154→      <div className="flex justify-between items-center mb-6">
+   155→        <h2 className="text-2xl font-bold text-gray-900">Restaurants</h2>
+   156→        <button onClick={() => { setEditItem(null); setForm({ name: '', description: '', email: '', phone: '', address: '', city: '', state: '', openTime: '', closeTime: '', openDays: '', image: '', categoryId: '', isActive: true }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-orange-600"><Plus className="w-4 h-4" /> Add Restaurant</button>
+   157→      </div>
+   158→
+   159→      {showForm && (
+   160→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+   161→          <h3 className="font-semibold text-lg mb-4">{editItem ? 'Edit Restaurant' : 'New Restaurant'}</h3>
+   162→          <div className="grid md:grid-cols-2 gap-4">
+   163→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   164→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Category *</label><select value={form.categoryId} onChange={(e) => setForm(p => ({ ...p, categoryId: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"><option value="">Select category</option>{categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+   165→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   166→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   167→            <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><input type="text" value={form.address} onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   168→            <div><label className="block text-sm font-medium text-gray-700 mb-1">City</label><input type="text" value={form.city} onChange={(e) => setForm(p => ({ ...p, city: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   169→            <div><label className="block text-sm font-medium text-gray-700 mb-1">State</label><input type="text" value={form.state} onChange={(e) => setForm(p => ({ ...p, state: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   170→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Open / Close Time</label><div className="flex gap-2"><input type="text" value={form.openTime} onChange={(e) => setForm(p => ({ ...p, openTime: e.target.value }))} placeholder="08:00" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /><input type="text" value={form.closeTime} onChange={(e) => setForm(p => ({ ...p, closeTime: e.target.value }))} placeholder="22:00" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div></div>
+   171→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Open Days</label><input type="text" value={form.openDays} onChange={(e) => setForm(p => ({ ...p, openDays: e.target.value }))} placeholder="Mon-Sat" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   172→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Image</label><input type="file" accept="image/*" onChange={onUpload} className="w-full" />{form.image && <img src={form.image} alt="" className="w-20 h-20 rounded-lg mt-2 object-cover" />}</div>
+   173→            <div className="flex items-center gap-2"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 accent-primary" /><label className="text-sm font-medium text-gray-700">Active</label></div>
+   174→          </div>
+   175→          <div className="flex gap-3 mt-4"><button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{saveMutation.isPending ? 'Saving...' : 'Save'}</button><button onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button></div>
+   176→        </div>
+   177→      )}
+   178→
+   179→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   180→        <div className="overflow-x-auto">
+   181→          <table className="w-full">
+   182→            <thead className="bg-gray-50 border-b border-gray-200"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Image</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">City</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   183→            <tbody className="divide-y divide-gray-100">
+   184→              {restaurants.map((r: any) => (
+   185→                <tr key={r.id} className="hover:bg-gray-50">
+   186→                  <td className="px-4 py-3">{r.image ? <img src={r.image} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center"><Store className="w-5 h-5 text-orange-400" /></div>}</td>
+   187→                  <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
+   188→                  <td className="px-4 py-3 text-sm text-gray-500">{r.category?.name}</td>
+   189→                  <td className="px-4 py-3 text-sm text-gray-500">{r.city || '-'}</td>
+   190→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.isActive ? 'Active' : 'Inactive'}</span></td>
+   191→                  <td className="px-4 py-3"><div className="flex gap-2"><button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Edit className="w-4 h-4" /></button><button onClick={() => confirm('Delete?') && deleteMutation.mutate(r.id)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div></td>
+   192→                </tr>
+   193→              ))}
+   194→            </tbody>
+   195→          </table>
+   196→        </div>
+   197→      </div>
+   198→    </div>
+   199→  );
+   200→}
+   201→
+   202→// ─── FOODS ──────────────────────────
+   203→
+   204→export function AdminFoods() {
+   205→  const qc = useQueryClient();
+   206→  const [showForm, setShowForm] = useState(false);
+   207→  const [editItem, setEditItem] = useState<any>(null);
+   208→  const [search, setSearch] = useState('');
+   209→  const [form, setForm] = useState({ name: '', description: '', price: '', categoryId: '', restaurantId: '', image: '', isAvailable: true });
+   210→
+   211→  const { data: foods = [] } = useQuery({ queryKey: ['foods-admin', search], queryFn: () => fetch(`/api/foods${search ? `?search=${search}` : ''}`).then(r => r.json()).then(d => d.data || []) });
+   212→  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => fetch('/api/categories').then(r => r.json()).then(d => d.data || []) });
+   213→  const { data: restaurants = [] } = useQuery({ queryKey: ['restaurants-list'], queryFn: () => fetch('/api/restaurants').then(r => r.json()).then(d => d.data || []) });
+   214→
+   215→  const saveMutation = useMutation({
+   216→    mutationFn: (data: any) => fetch('/api/foods', { method: editItem ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editItem ? { ...data, id: editItem.id } : data) }).then(r => r.json()),
+   217→    onSuccess: () => { toast.success(editItem ? 'Food updated' : 'Food created'); setShowForm(false); setEditItem(null); qc.invalidateQueries({ queryKey: ['foods-admin'] }); },
+   218→  });
+   219→
+   220→  const deleteMutation = useMutation({
+   221→    mutationFn: (id: string) => fetch(`/api/foods?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+   222→    onSuccess: () => { toast.success('Food deleted'); qc.invalidateQueries({ queryKey: ['foods-admin'] }); },
+   223→  });
+   224→
+   225→  const toggleMutation = useMutation({
+   226→    mutationFn: ({ id, isAvailable }: { id: string; isAvailable: boolean }) => fetch('/api/foods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, isAvailable }) }).then(r => r.json()),
+   227→    onSuccess: () => qc.invalidateQueries({ queryKey: ['foods-admin'] }),
+   228→  });
+   229→
+   230→  const handleEdit = (f: any) => { setEditItem(f); setForm({ name: f.name, description: f.description || '', price: String(f.price), categoryId: f.categoryId || f.category?.id || '', restaurantId: f.restaurantId || f.restaurant?.id || '', image: f.image || '', isAvailable: f.isAvailable }); setShowForm(true); };
+   231→  const onUpload = handleUpload(setForm);
+   232→
+   233→  return (
+   234→    <div>
+   235→      <div className="flex justify-between items-center mb-6">
+   236→        <h2 className="text-2xl font-bold text-gray-900">Food Menu</h2>
+   237→        <button onClick={() => { setEditItem(null); setForm({ name: '', description: '', price: '', categoryId: '', restaurantId: '', image: '', isAvailable: true }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-orange-600"><Plus className="w-4 h-4" /> Add Food</button>
+   238→      </div>
+   239→
+   240→      <div className="relative mb-4 max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search foods..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   241→
+   242→      {showForm && (
+   243→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+   244→          <h3 className="font-semibold text-lg mb-4">{editItem ? 'Edit Food' : 'New Food'}</h3>
+   245→          <div className="grid md:grid-cols-2 gap-4">
+   246→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   247→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Price (₦) *</label><input type="number" value={form.price} onChange={(e) => setForm(p => ({ ...p, price: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   248→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Category *</label><select value={form.categoryId} onChange={(e) => setForm(p => ({ ...p, categoryId: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"><option value="">Select</option>{categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+   249→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Restaurant *</label><select value={form.restaurantId} onChange={(e) => setForm(p => ({ ...p, restaurantId: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"><option value="">Select</option>{restaurants.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+   250→            <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   251→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Image</label><input type="file" accept="image/*" onChange={onUpload} className="w-full" />{form.image && <img src={form.image} alt="" className="w-20 h-20 rounded-lg mt-2 object-cover" />}</div>
+   252→            <div className="flex items-center gap-2 pt-6"><input type="checkbox" checked={form.isAvailable} onChange={(e) => setForm(p => ({ ...p, isAvailable: e.target.checked }))} className="w-4 h-4 accent-primary" /><label className="text-sm font-medium text-gray-700">Available</label></div>
+   253→          </div>
+   254→          <div className="flex gap-3 mt-4"><button onClick={() => saveMutation.mutate({ ...form, price: Number(form.price) })} disabled={saveMutation.isPending} className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{saveMutation.isPending ? 'Saving...' : 'Save'}</button><button onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button></div>
+   255→        </div>
+   256→      )}
+   257→
+   258→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   259→        <div className="overflow-x-auto">
+   260→          <table className="w-full">
+   261→            <thead className="bg-gray-50 border-b border-gray-200"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Image</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Restaurant</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Price</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Available</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   262→            <tbody className="divide-y divide-gray-100">
+   263→              {foods.map((f: any) => (
+   264→                <tr key={f.id} className="hover:bg-gray-50">
+   265→                  <td className="px-4 py-3">{f.image ? <img src={f.image} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-lg">🍽️</div>}</td>
+   266→                  <td className="px-4 py-3 font-medium text-gray-900">{f.name}</td>
+   267→                  <td className="px-4 py-3 text-sm text-gray-500">{f.category?.name}</td>
+   268→                  <td className="px-4 py-3 text-sm text-gray-500">{f.restaurant?.name}</td>
+   269→                  <td className="px-4 py-3 font-semibold">{formatNaira(f.price)}</td>
+   270→                  <td className="px-4 py-3"><button onClick={() => toggleMutation.mutate({ id: f.id, isAvailable: !f.isAvailable })} className={`px-2 py-0.5 rounded-full text-xs font-medium ${f.isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{f.isAvailable ? 'Yes' : 'No'}</button></td>
+   271→                  <td className="px-4 py-3"><div className="flex gap-2"><button onClick={() => handleEdit(f)} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Edit className="w-4 h-4" /></button><button onClick={() => confirm('Delete?') && deleteMutation.mutate(f.id)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div></td>
+   272→                </tr>
+   273→              ))}
+   274→            </tbody>
+   275→          </table>
+   276→        </div>
+   277→      </div>
+   278→    </div>
+   279→  );
+   280→}
+   281→
+   282→// ─── ORDERS ──────────────────────────
+   283→
+   284→export function AdminOrders() {
+   285→  const qc = useQueryClient();
+   286→  const [statusFilter, setStatusFilter] = useState('');
+   287→  const [viewOrder, setViewOrder] = useState<any>(null);
+   288→
+   289→  const { data: orders = [], isLoading } = useQuery({
+   290→    queryKey: ['orders-admin', statusFilter],
+   291→    queryFn: () => fetch(`/api/orders${statusFilter ? `?status=${statusFilter}` : ''}`).then(r => r.json()).then(d => d.data || []),
+   292→  });
+   293→
+   294→  const updateStatus = useMutation({
+   295→    mutationFn: ({ id, status, remark }: { id: string; status: string; remark?: string }) => fetch('/api/orders', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status, remark }) }).then(r => r.json()),
+   296→    onSuccess: () => { toast.success('Order status updated'); qc.invalidateQueries({ queryKey: ['orders-admin'] }); setViewOrder(null); },
+   297→  });
+   298→
+   299→  const deleteMutation = useMutation({
+   300→    mutationFn: (id: string) => fetch(`/api/orders?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+   301→    onSuccess: () => { toast.success('Order deleted'); qc.invalidateQueries({ queryKey: ['orders-admin'] }); },
+   302→  });
+   303→
+   304→  if (viewOrder) {
+   305→    return (
+   306→      <div>
+   307→        <button onClick={() => setViewOrder(null)} className="flex items-center gap-2 text-gray-600 hover:text-primary mb-4"><ArrowLeft className="w-4 h-4" /> Back</button>
+   308→        <div className="bg-white rounded-xl shadow-sm p-6">
+   309→          <div className="flex justify-between items-start mb-4">
+   310→            <div><h2 className="text-xl font-bold">{viewOrder.orderNumber}</h2><p className="text-gray-500 text-sm">{new Date(viewOrder.createdAt).toLocaleString()}</p></div>
+   311→            <StatusBadge status={viewOrder.status} />
+   312→          </div>
+   313→          <div className="grid md:grid-cols-2 gap-4 mb-4">
+   314→            <div className="bg-gray-50 rounded-lg p-3"><h4 className="font-semibold text-sm mb-1">Customer</h4><p className="text-sm">{viewOrder.customerName}</p><p className="text-sm text-gray-500">{viewOrder.customerPhone}</p><p className="text-sm text-gray-500">{viewOrder.deliveryAddress}, {viewOrder.deliveryCity}</p></div>
+   315→            <div className="bg-gray-50 rounded-lg p-3"><h4 className="font-semibold text-sm mb-1">Payment</h4><p className="text-sm">{viewOrder.paymentMethod === 'PAYSTACK' ? 'Paystack' : 'Cash on Delivery'}</p><p className="text-sm"><span className={viewOrder.paymentStatus === 'PAID' ? 'text-green-600 font-semibold' : 'text-yellow-600'}>{viewOrder.paymentStatus}</span></p><p className="text-lg font-bold mt-1">{formatNaira(viewOrder.totalAmount)}</p></div>
+   316→          </div>
+   317→          <h4 className="font-semibold text-sm mb-2">Items</h4>
+   318→          <div className="space-y-1 mb-4">
+   319→            {viewOrder.items?.map((item: any) => (
+   320→              <div key={item.id} className="flex justify-between text-sm bg-gray-50 p-2 rounded"><span>{item.foodName} × {item.quantity}</span><span className="font-medium">{formatNaira(item.totalPrice)}</span></div>
+   321→            ))}
+   322→          </div>
+   323→          <div className="border-t pt-4">
+   324→            <h4 className="font-semibold text-sm mb-2">Update Status</h4>
+   325→            <div className="flex gap-2 flex-wrap">
+   326→              {['CONFIRMED', 'PREPARING', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'].map(s => (
+   327→                <button key={s} onClick={() => updateStatus.mutate({ id: viewOrder.id, status: s })} disabled={updateStatus.isPending} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${s === 'CANCELLED' ? 'bg-red-50 text-red-600 hover:bg-red-100' : s === 'DELIVERED' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+   328→                  {s.replace(/_/g, ' ')}
+   329→                </button>
+   330→              ))}
+   331→            </div>
+   332→          </div>
+   333→        </div>
+   334→      </div>
+   335→    );
+   336→  }
+   337→
+   338→  return (
+   339→    <div>
+   340→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Orders</h2>
+   341→      <div className="flex gap-2 overflow-x-auto scrollbar-hidden pb-4 mb-4">
+   342→        {['', 'PENDING', 'CONFIRMED', 'PREPARING', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'].map(s => (
+   343→          <button key={s} onClick={() => setStatusFilter(s)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s || 'All'}</button>
+   344→        ))}
+   345→      </div>
+   346→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   347→        <div className="overflow-x-auto">
+   348→          <table className="w-full">
+   349→            <thead className="bg-gray-50 border-b"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Order #</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Customer</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Payment</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   350→            <tbody className="divide-y divide-gray-100">
+   351→              {isLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+   352→              : orders.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No orders found</td></tr>
+   353→              : orders.map((o: any) => (
+   354→                <tr key={o.id} className="hover:bg-gray-50">
+   355→                  <td className="px-4 py-3 font-medium text-sm">{o.orderNumber}</td>
+   356→                  <td className="px-4 py-3 text-sm">{o.customerName || '-'}</td>
+   357→                  <td className="px-4 py-3 font-semibold text-sm">{formatNaira(o.totalAmount)}</td>
+   358→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${o.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.paymentStatus}</span></td>
+   359→                  <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
+   360→                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(o.createdAt).toLocaleDateString()}</td>
+   361→                  <td className="px-4 py-3"><div className="flex gap-2"><button onClick={() => setViewOrder(o)} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Eye className="w-4 h-4" /></button><button onClick={() => confirm('Delete?') && deleteMutation.mutate(o.id)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div></td>
+   362→                </tr>
+   363→              ))}
+   364→            </tbody>
+   365→          </table>
+   366→        </div>
+   367→      </div>
+   368→    </div>
+   369→  );
+   370→}
+   371→
+   372→// ─── CUSTOMERS ──────────────────────────
+   373→
+   374→export function AdminCustomers() {
+   375→  const { data: users = [], isLoading } = useQuery({
+   376→    queryKey: ['users'],
+   377→    queryFn: () => fetch('/api/users').then(r => r.json()).then(d => d.data || []),
+   378→  });
+   379→
+   380→  const blockMutation = useMutation({
+   381→    mutationFn: ({ id, status }: { id: string; status: string }) => fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }).then(r => r.json()),
+   382→    onSuccess: (_, vars) => { toast.success(`User ${vars.status === 'BLOCKED' ? 'blocked' : 'unblocked'}`); },
+   383→  });
+   384→
+   385→  return (
+   386→    <div>
+   387→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Customers</h2>
+   388→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   389→        <div className="overflow-x-auto">
+   390→          <table className="w-full">
+   391→            <thead className="bg-gray-50 border-b"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Phone</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Role</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Joined</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   392→            <tbody className="divide-y divide-gray-100">
+   393→              {isLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+   394→              : users.map((u: any) => (
+   395→                <tr key={u.id} className="hover:bg-gray-50">
+   396→                  <td className="px-4 py-3 font-medium text-sm">{u.name}</td>
+   397→                  <td className="px-4 py-3 text-sm text-gray-500">{u.email}</td>
+   398→                  <td className="px-4 py-3 text-sm text-gray-500">{u.phone || '-'}</td>
+   399→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.role === 'ADMIN' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>{u.role}</span></td>
+   400→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{u.status}</span></td>
+   401→                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
+   402→                  <td className="px-4 py-3">{u.role !== 'ADMIN' && <button onClick={() => blockMutation.mutate({ id: u.id, status: u.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE' })} className={`px-3 py-1 rounded text-xs font-medium ${u.status === 'ACTIVE' ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-green-600 bg-green-50 hover:bg-green-100'}`}>{u.status === 'ACTIVE' ? 'Block' : 'Unblock'}</button>}</td>
+   403→                </tr>
+   404→              ))}
+   405→            </tbody>
+   406→          </table>
+   407→        </div>
+   408→      </div>
+   409→    </div>
+   410→  );
+   411→}
+   412→
+   413→// ─── EARNINGS ──────────────────────────
+   414→
+   415→export function AdminEarnings() {
+   416→  const { data, isLoading } = useQuery({
+   417→    queryKey: ['earnings'],
+   418→    queryFn: () => fetch('/api/dashboard/earnings?period=all').then(r => r.json()).then(d => d.data),
+   419→  });
+   420→
+   421→  return (
+   422→    <div>
+   423→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Earnings</h2>
+   424→      <div className="grid md:grid-cols-3 gap-4 mb-6">
+   425→        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-emerald-500">
+   426→          <p className="text-sm text-gray-500">Total Earnings</p>
+   427→          <p className="text-2xl font-bold text-gray-900">{formatNaira(data?.totalEarnings || 0)}</p>
+   428→        </div>
+   429→        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-blue-500">
+   430→          <p className="text-sm text-gray-500">Paystack</p>
+   431→          <p className="text-2xl font-bold text-gray-900">{formatNaira(data?.paystackEarnings || 0)}</p>
+   432→        </div>
+   433→        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-orange-500">
+   434→          <p className="text-sm text-gray-500">Cash on Delivery</p>
+   435→          <p className="text-2xl font-bold text-gray-900">{formatNaira(data?.codEarnings || 0)}</p>
+   436→        </div>
+   437→      </div>
+   438→      {data?.topRestaurants?.length > 0 && (
+   439→        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   440→          <div className="p-4 border-b"><h3 className="font-semibold">Top Restaurants</h3></div>
+   441→          <table className="w-full"><thead className="bg-gray-50"><tr><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Restaurant</th><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Orders</th><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Revenue</th></tr></thead>
+   442→          <tbody className="divide-y">{data.topRestaurants.map((r: any, i: number) => <tr key={i} className="hover:bg-gray-50"><td className="px-4 py-2 text-sm font-medium">{r.name}</td><td className="px-4 py-2 text-sm text-gray-500">{r.orders}</td><td className="px-4 py-2 text-sm font-semibold">{formatNaira(r.revenue)}</td></tr>)}</tbody></table>
+   443→        </div>
+   444→      )}
+   445→    </div>
+   446→  );
+   447→}
+   448→
+   449→// ─── OWNERS ──────────────────────────
+   450→
+   451→export function AdminOwners() {
+   452→  const qc = useQueryClient();
+   453→  const [showAssign, setShowAssign] = useState(false);
+   454→  const [selectedRestaurant, setSelectedRestaurant] = useState('');
+   455→  const [selectedOwner, setSelectedOwner] = useState('');
+   456→
+   457→  const { data: owners = [], isLoading: loadingOwners } = useQuery({
+   458→    queryKey: ['restaurant-owners'],
+   459→    queryFn: () => fetch('/api/users?role=RESTAURANT_OWNER').then(r => r.json()).then(d => d.data || []),
+   460→  });
+   461→
+   462→  const { data: restaurants = [], isLoading: loadingRestaurants } = useQuery({
+   463→    queryKey: ['restaurants-all'],
+   464→    queryFn: () => fetch('/api/restaurants').then(r => r.json()).then(d => d.data || []),
+   465→  });
+   466→
+   467→  const assignMutation = useMutation({
+   468→    mutationFn: ({ restaurantId, ownerId }: { restaurantId: string; ownerId: string }) =>
+   469→      fetch('/api/restaurants', {
+   470→        method: 'PUT',
+   471→        headers: { 'Content-Type': 'application/json' },
+   472→        body: JSON.stringify({ id: restaurantId, ownerId }),
+   473→      }).then(r => r.json()),
+   474→    onSuccess: () => {
+   475→      toast.success('Owner assigned successfully');
+   476→      qc.invalidateQueries({ queryKey: ['restaurants-all'] });
+   477→      qc.invalidateQueries({ queryKey: ['restaurant-owners'] });
+   478→      setShowAssign(false);
+   479→    },
+   480→    onError: () => toast.error('Failed to assign owner'),
+   481→  });
+   482→
+   483→  // Unassigned restaurants
+   484→  const unassignedRestaurants = restaurants.filter((r: any) => !r.ownerId);
+   485→  // All restaurant owners
+   486→  const ownerUsers = owners;
+   487→
+   488→  return (
+   489→    <div>
+   490→      <div className="flex items-center justify-between mb-6">
+   491→        <h2 className="text-2xl font-bold text-gray-900">Restaurant Owners</h2>
+   492→        <button onClick={() => setShowAssign(!showAssign)} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
+   493→          <Plus className="w-4 h-4" /> Assign Owner
+   494→        </button>
+   495→      </div>
+   496→
+   497→      {/* Assign Owner Dialog */}
+   498→      {showAssign && (
+   499→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border-2 border-orange-200">
+   500→          <h3 className="font-semibold text-lg mb-4">Assign Restaurant Owner</h3>
+   501→          <div className="space-y-4">
+   502→            <div>
+   503→              <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant</label>
+   504→              <select value={selectedRestaurant} onChange={(e) => setSelectedRestaurant(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg">
+   505→                <option value="">Select a restaurant</option>
+   506→                {restaurants.map((r: any) => (
+   507→                  <option key={r.id} value={r.id}>{r.name} {r.ownerId ? '(has owner)' : '(unassigned)'}</option>
+   508→                ))}
+   509→              </select>
+   510→            </div>
+   511→            <div>
+   512→              <label className="block text-sm font-medium text-gray-700 mb-1">Owner User</label>
+   513→              <select value={selectedOwner} onChange={(e) => setSelectedOwner(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg">
+   514→                <option value="">Select an owner</option>
+   515→                {ownerUsers.map((u: any) => (
+   516→                  <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+   517→                ))}
+   518→              </select>
+   519→            </div>
+   520→            <div className="flex gap-2">
+   521→              <button onClick={() => { if (selectedRestaurant && selectedOwner) assignMutation.mutate({ restaurantId: selectedRestaurant, ownerId: selectedOwner }); }} disabled={!selectedRestaurant || !selectedOwner || assignMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-50">Assign</button>
+   522→              <button onClick={() => setShowAssign(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">Cancel</button>
+   523→            </div>
+   524→          </div>
+   525→        </div>
+   526→      )}
+   527→
+   528→      {/* Owner List */}
+   529→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   530→        <div className="overflow-x-auto">
+   531→          <table className="w-full">
+   532→            <thead className="bg-gray-50 border-b">
+   533→              <tr>
+   534→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Owner</th>
+   535→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
+   536→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Phone</th>
+   537→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Restaurant</th>
+   538→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+   539→              </tr>
+   540→            </thead>
+   541→            <tbody className="divide-y divide-gray-100">
+   542→              {loadingOwners ? (
+   543→                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+   544→              ) : ownerUsers.length === 0 ? (
+   545→                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No restaurant owners found. Register users with RESTAURANT_OWNER role.</td></tr>
+   546→              ) : ownerUsers.map((owner: any) => {
+   547→                const ownedRestaurants = restaurants.filter((r: any) => r.ownerId === owner.id);
+   548→                return (
+   549→                  <tr key={owner.id} className="hover:bg-gray-50">
+   550→                    <td className="px-4 py-3">
+   551→                      <div className="flex items-center gap-2">
+   552→                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+   553→                          <Users className="w-4 h-4 text-emerald-700" />
+   554→                        </div>
+   555→                        <span className="font-medium text-sm">{owner.name}</span>
+   556→                      </div>
+   557→                    </td>
+   558→                    <td className="px-4 py-3 text-sm text-gray-500">{owner.email}</td>
+   559→                    <td className="px-4 py-3 text-sm text-gray-500">{owner.phone || '-'}</td>
+   560→                    <td className="px-4 py-3 text-sm">
+   561→                      {ownedRestaurants.length > 0 ? (
+   562→                        <div className="space-y-1">
+   563→                          {ownedRestaurants.map((r: any) => (
+   564→                            <span key={r.id} className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs font-medium mr-1">{r.name}</span>
+   565→                          ))}
+   566→                        </div>
+   567→                      ) : (
+   568→                        <span className="text-gray-400">No restaurant assigned</span>
+   569→                      )}
+   570→                    </td>
+   571→                    <td className="px-4 py-3">
+   572→                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${owner.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{owner.status}</span>
+   573→                    </td>
+   574→                  </tr>
+   575→                );
+   576→              })}
+   577→            </tbody>
+   578→          </table>
+   579→        </div>
+   580→      </div>
+   581→
+   582→      {/* Unassigned Restaurants */}
+   583→      {unassignedRestaurants.length > 0 && (
+   584→        <div className="mt-6">
+   585→          <h3 className="text-lg font-semibold text-gray-900 mb-3">Unassigned Restaurants</h3>
+   586→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   587→            {unassignedRestaurants.map((r: any) => (
+   588→              <div key={r.id} className="bg-white rounded-lg shadow-sm p-4 flex items-center justify-between">
+   589→                <div className="flex items-center gap-3">
+   590→                  {r.image ? <img src={r.image} alt={r.name} className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center"><Store className="w-5 h-5 text-orange-600" /></div>}
+   591→                  <div><p className="font-medium text-sm">{r.name}</p><p className="text-xs text-gray-500">{r.city || 'No city'}</p></div>
+   592→                </div>
+   593→                <button onClick={() => { setSelectedRestaurant(r.id); setShowAssign(true); }} className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20">Assign Owner</button>
+   594→              </div>
+   595→            ))}
+   596→          </div>
+   597→        </div>
+   598→      )}
+   599→    </div>
+   600→  );
+   601→}
+   602→

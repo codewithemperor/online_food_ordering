@@ -115,7 +115,7 @@ export function HomeSection() {
                     transition={{ duration: 3, repeat: Infinity, delay: i * 0.5 }}
                     className={`absolute ${i === 0 ? '-bottom-4 -left-4' : '-top-4 -right-4'} bg-white rounded-xl shadow-lg p-3 flex items-center gap-2`}
                   >
-                    {food.image ? <img src={food.image} alt={food.name} className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">🍽️</div>}
+                    {food.image ? <img src={food.image} alt={food.name} className="w-10 h-10 rounded-lg object-cover" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">🍽️</div>}
                     <div>
                       <p className="text-xs font-semibold text-gray-800">{food.name}</p>
                       <p className="text-xs text-red-600 font-bold">{formatNaira(food.price)}</p>
@@ -178,10 +178,23 @@ export function HomeSection() {
               <motion.div key={food.id} variants={fadeUp} className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow border border-gray-100 group">
                 <div className="relative h-48 bg-gray-100 overflow-hidden">
                   {food.image ? (
-                    <img src={food.image} alt={food.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-4xl">🍽️</div>
-                  )}
+                    <img
+                      src={food.image}
+                      alt={food.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        target.nextElementSibling?.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-full h-full flex items-center justify-center ${food.image ? 'hidden' : ''}`}>
+                    <div className="text-center">
+                      <UtensilsCrossed className="w-12 h-12 text-orange-300 mx-auto mb-1" />
+                      <span className="text-xs text-orange-400 font-medium">{food.name}</span>
+                    </div>
+                  </div>
                   {!food.isAvailable && <div className="absolute inset-0 bg-black/50 flex items-center justify-center"><span className="bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">Unavailable</span></div>}
                   <button
                     onClick={(e) => { e.stopPropagation(); if (food.isAvailable) handleAddToCart(food); }}
@@ -240,12 +253,21 @@ export function HomeSection() {
               <motion.div key={rest.id} whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow">
                 <div className="h-52 bg-gray-100 relative overflow-hidden">
                   {rest.image ? (
-                    <img src={rest.image} alt={rest.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-orange-200">
-                      <UtensilsCrossed className="w-12 h-12 text-orange-400" />
-                    </div>
-                  )}
+                    <img
+                      src={rest.image}
+                      alt={rest.name}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        const target = e.target as HTMLImageElement;
+                        target.style.display = 'none';
+                        const fallback = target.nextElementSibling as HTMLElement;
+                        if (fallback) fallback.classList.remove('hidden');
+                      }}
+                    />
+                  ) : null}
+                  <div className={`w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-100 to-orange-200 ${rest.image ? 'hidden' : ''}`}>
+                    <UtensilsCrossed className="w-12 h-12 text-orange-400" />
+                  </div>
                   <span className="absolute top-3 left-3 bg-primary text-white px-3 py-1 rounded-full text-xs font-medium">{rest.category.name}</span>
                   {!rest.isActive && <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-xs font-medium">Closed</div>}
                 </div>

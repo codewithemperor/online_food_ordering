@@ -41,22 +41,45 @@ export async function POST(request: NextRequest) {
             // Verify amount matches
             const paidAmount = amount / 100; // Convert from kobo
             if (Math.abs(paidAmount - order.totalAmount) < 1) {
+              const updatedStatus = order.status === 'PENDING' ? 'CONFIRMED' : order.status;
               await db.order.update({
                 where: { id: order.id },
                 data: {
                   paymentStatus: 'PAID',
-                  status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+                  status: updatedStatus,
                 },
+              });
+
+              // Also update all sub-orders to CONFIRMED if still PENDING
+              await db.subOrder.updateMany({
+                where: { orderId: order.id, status: 'PENDING' },
+                data: { status: 'CONFIRMED' },
               });
 
               await db.orderStatusHistory.create({
                 data: {
                   orderId: order.id,
-                  status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+                  status: updatedStatus,
                   remark: `Payment confirmed via Paystack webhook. Reference: ${reference}`,
                   changedBy: 'system',
                 },
               });
+
+              // Create status history for each sub-order
+              const subOrders = await db.subOrder.findMany({
+                where: { orderId: order.id },
+                select: { id: true },
+              });
+              for (const so of subOrders) {
+                await db.subOrderStatusHistory.create({
+                  data: {
+                    subOrderId: so.id,
+                    status: 'CONFIRMED',
+                    remark: 'Payment confirmed via Paystack webhook — order confirmed automatically',
+                    changedByRole: 'SYSTEM',
+                  },
+                });
+              }
             } else {
               console.warn(
                 `Amount mismatch for order ${order.id}: expected ${order.totalAmount}, got ${paidAmount}`

@@ -24,6 +24,9 @@ const dancing = Dancing_Script({
 export const metadata: Metadata = {
   title: "NaijaBites — Nigerian Food Ordering",
   description: "Order delicious Nigerian meals from the best restaurants. Fast delivery, secure payment with Paystack.",
+  icons: {
+    icon: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

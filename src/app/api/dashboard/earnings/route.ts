@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
     // Get daily data for chart (last 30 days or period-based)
     const daysBack = period === 'today' ? 1 : period === 'week' ? 7 : period === 'month' ? 30 : period === 'year' ? 365 : 30;
-    const dailyData = [];
+    const dailyData: { date: string; revenue: number; orders: number }[] = [];
 
     for (let i = daysBack - 1; i >= 0; i--) {
       const day = subDays(new Date(), i);
@@ -92,17 +92,20 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Top restaurants by earnings
+    // Top restaurants by earnings — use subOrders since Restaurant
+    // has subOrders relation, not orders
     const topRestaurants = await db.restaurant.findMany({
       take: 5,
       include: {
-        _count: { select: { orders: true } },
-        orders: {
+        _count: { select: { subOrders: true } },
+        subOrders: {
           where: {
             ...dateFilter,
-            paymentStatus: 'PAID',
+            order: {
+              paymentStatus: 'PAID',
+            },
           },
-          select: { totalAmount: true },
+          select: { subtotal: true, deliveryFee: true },
         },
       },
     });
@@ -112,8 +115,8 @@ export async function GET(request: NextRequest) {
         id: r.id,
         name: r.name,
         image: r.image,
-        orderCount: r._count.orders,
-        earnings: r.orders.reduce((sum, o) => sum + o.totalAmount, 0),
+        orderCount: r._count.subOrders,
+        earnings: r.subOrders.reduce((sum, so) => sum + so.subtotal + so.deliveryFee, 0),
       }))
       .sort((a, b) => b.earnings - a.earnings)
       .slice(0, 5);

@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
     if (error) return error;
 
     // @ts-expect-error - role is added by our custom session
-    const isAdmin = session.user.role === 'admin';
+    const isAdmin = session.user.role === 'ADMIN';
     // @ts-expect-error - id is on session user
     const userId = session.user.id;
 

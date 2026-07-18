@@ -52,22 +52,46 @@ export async function GET(request: NextRequest) {
 
         if (paymentStatus === 'success') {
           // Update order payment status
+          const updatedStatus = order.status === 'PENDING' ? 'CONFIRMED' : order.status;
           await db.order.update({
             where: { id: order.id },
             data: {
               paymentStatus: 'PAID',
-              status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+              status: updatedStatus,
             },
           });
 
+          // Also update all sub-orders to CONFIRMED if they're still PENDING
+          await db.subOrder.updateMany({
+            where: { orderId: order.id, status: 'PENDING' },
+            data: { status: 'CONFIRMED' },
+          });
+
+          // Create status history for parent order
           await db.orderStatusHistory.create({
             data: {
               orderId: order.id,
-              status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+              status: updatedStatus,
               remark: 'Payment confirmed via Paystack',
               changedBy: 'system',
             },
           });
+
+          // Create status history for each sub-order
+          const subOrders = await db.subOrder.findMany({
+            where: { orderId: order.id },
+            select: { id: true },
+          });
+          for (const so of subOrders) {
+            await db.subOrderStatusHistory.create({
+              data: {
+                subOrderId: so.id,
+                status: 'CONFIRMED',
+                remark: 'Payment confirmed via Paystack — order confirmed automatically',
+                changedByRole: 'SYSTEM',
+              },
+            });
+          }
 
           return NextResponse.json({
             data: {
@@ -110,22 +134,45 @@ export async function GET(request: NextRequest) {
 
     // Mock/placeholder: when Paystack is not configured
     // Mark as paid for testing purposes
+    const mockUpdatedStatus = order.status === 'PENDING' ? 'CONFIRMED' : order.status;
     await db.order.update({
       where: { id: order.id },
       data: {
         paymentStatus: 'PAID',
-        status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+        status: mockUpdatedStatus,
       },
+    });
+
+    // Also update all sub-orders to CONFIRMED if still PENDING
+    await db.subOrder.updateMany({
+      where: { orderId: order.id, status: 'PENDING' },
+      data: { status: 'CONFIRMED' },
     });
 
     await db.orderStatusHistory.create({
       data: {
         orderId: order.id,
-        status: order.status === 'PENDING' ? 'CONFIRMED' : order.status,
+        status: mockUpdatedStatus,
         remark: 'Payment confirmed (mock - Paystack not configured)',
         changedBy: 'system',
       },
     });
+
+    // Create status history for each sub-order
+    const mockSubOrders = await db.subOrder.findMany({
+      where: { orderId: order.id },
+      select: { id: true },
+    });
+    for (const so of mockSubOrders) {
+      await db.subOrderStatusHistory.create({
+        data: {
+          subOrderId: so.id,
+          status: 'CONFIRMED',
+          remark: 'Mock payment confirmed — order confirmed automatically',
+          changedByRole: 'SYSTEM',
+        },
+      });
+    }
 
     return NextResponse.json({
       data: {

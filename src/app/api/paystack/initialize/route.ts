@@ -46,6 +46,10 @@ export async function POST(request: NextRequest) {
     // If Paystack key is configured, make real API call
     if (PAYSTACK_SECRET_KEY) {
       try {
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL ||
+          request.headers.get('origin') ||
+          `https://${request.headers.get('host')}`;
+
         const response = await fetch('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
           headers: {
@@ -56,6 +60,7 @@ export async function POST(request: NextRequest) {
             email: paymentEmail,
             amount: Math.round(amount * 100), // Paystack expects amount in kobo
             reference,
+            callback_url: `${baseUrl}/payment/callback`,
             metadata: {
               orderId,
               userId,
@@ -107,7 +112,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       data: {
-        authorizationUrl: `/payment/mock?reference=${reference}&orderId=${orderId}`,
+        authorizationUrl: `/payment/callback?reference=${reference}`,
         reference,
         _mock: true,
         _message: 'Paystack is not configured. Using mock payment flow.',

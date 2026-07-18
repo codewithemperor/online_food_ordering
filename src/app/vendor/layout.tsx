@@ -14,7 +14,9 @@ import {
   RefreshCw,
   Store,
   XCircle,
+  LogOut,
 } from 'lucide-react';
+import { signOut } from 'next-auth/react';
 import toast from 'react-hot-toast';
 import type { Restaurant } from '@/types';
 
@@ -357,6 +359,15 @@ export default function VendorLayout({ children }: { children: React.ReactNode }
           >
             <ArrowLeft className="h-4 w-4 shrink-0" />
             {!sidebarCollapsed && <span>Back to Store</span>}
+          </button>
+
+          {/* Logout */}
+          <button
+            onClick={() => signOut({ callbackUrl: '/' })}
+            className="w-full flex items-center gap-2 px-3 py-2 text-emerald-200 hover:text-red-300 hover:bg-emerald-800/50 rounded-md text-sm transition-colors"
+          >
+            <LogOut className="h-4 w-4 shrink-0" />
+            {!sidebarCollapsed && <span>Logout</span>}
           </button>
 
           {/* Collapse toggle */}

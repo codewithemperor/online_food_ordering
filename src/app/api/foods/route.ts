@@ -11,8 +11,9 @@ export async function GET(request: NextRequest) {
     const isAvailable = searchParams.get('isAvailable');
     const minPrice = searchParams.get('minPrice');
     const maxPrice = searchParams.get('maxPrice');
+    const limit = searchParams.get('limit');
     const page = parseInt(searchParams.get('page') || '1');
-    const pageSize = parseInt(searchParams.get('pageSize') || '20');
+    const pageSize = limit ? parseInt(limit) : parseInt(searchParams.get('pageSize') || '20');
 
     const where: Record<string, unknown> = {};
 

@@ -439,7 +439,7 @@ export function AdminEarnings() {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="p-4 border-b"><h3 className="font-semibold">Top Restaurants</h3></div>
           <table className="w-full"><thead className="bg-gray-50"><tr><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Restaurant</th><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Orders</th><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Revenue</th></tr></thead>
-          <tbody className="divide-y">{data.topRestaurants.map((r: any, i: number) => <tr key={i} className="hover:bg-gray-50"><td className="px-4 py-2 text-sm font-medium">{r.name}</td><td className="px-4 py-2 text-sm text-gray-500">{r.orders}</td><td className="px-4 py-2 text-sm font-semibold">{formatNaira(r.revenue)}</td></tr>)}</tbody></table>
+          <tbody className="divide-y">{data.topRestaurants.map((r: any, i: number) => <tr key={i} className="hover:bg-gray-50"><td className="px-4 py-2 text-sm font-medium">{r.name}</td><td className="px-4 py-2 text-sm text-gray-500">{r.orderCount}</td><td className="px-4 py-2 text-sm font-semibold">{formatNaira(r.earnings)}</td></tr>)}</tbody></table>
         </div>
       )}
     </div>
