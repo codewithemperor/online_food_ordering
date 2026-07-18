@@ -1,0 +1,95 @@
+// ─── App Constants ────────────────────────────────────
+export const APP_NAME = 'NaijaBites';
+
+export const DELIVERY_FEE = 500;
+
+export const FREE_DELIVERY_THRESHOLD = 5000;
+
+// ─── Nigerian States ──────────────────────────────────
+export const NIGERIAN_STATES = [
+  'Abia',
+  'Adamawa',
+  'Akwa Ibom',
+  'Anambra',
+  'Bauchi',
+  'Bayelsa',
+  'Benue',
+  'Borno',
+  'Cross River',
+  'Delta',
+  'Ebonyi',
+  'Edo',
+  'Ekiti',
+  'Enugu',
+  'FCT',
+  'Gombe',
+  'Imo',
+  'Jigawa',
+  'Kaduna',
+  'Kano',
+  'Katsina',
+  'Kebbi',
+  'Kogi',
+  'Kwara',
+  'Lagos',
+  'Nasarawa',
+  'Niger',
+  'Ogun',
+  'Ondo',
+  'Osun',
+  'Oyo',
+  'Plateau',
+  'Rivers',
+  'Sokoto',
+  'Taraba',
+  'Yobe',
+  'Zamfara',
+] as const;
+
+// ─── Nigerian Cities ──────────────────────────────────
+export const NIGERIAN_CITIES = [
+  'Lagos',
+  'Ikeja',
+  'Lekki',
+  'Victoria Island',
+  'Ikoyi',
+  'Surulere',
+  'Yaba',
+  'Ajah',
+  'Abuja',
+  'Wuse',
+  'Garki',
+  'Maitama',
+  'Asokoro',
+  'Kubwa',
+  'Lugbe',
+  'Kano',
+  'Ibadan',
+  'Port Harcourt',
+  'Benin City',
+  'Enugu',
+  'Aba',
+  'Calabar',
+  'Uyo',
+  'Kaduna',
+  'Jos',
+  'Warri',
+  'Abeokuta',
+  'Akure',
+  'Owerri',
+  'Sokoto',
+  'Maiduguri',
+  'Ilọrin',
+  'Osogbo',
+  'Ado-Ekiti',
+] as const;
+
+// ─── Default Categories ───────────────────────────────
+export const DEFAULT_CATEGORIES = [
+  { name: 'Nigerian', description: 'Traditional Nigerian dishes — jollof rice, suya, pounded yam and more', icon: 'UtensilsCrossed' },
+  { name: 'Continental', description: 'European and American-style dishes with a local twist', icon: 'Globe' },
+  { name: 'Chinese', description: 'Authentic Chinese cuisine — stir-fry, noodles, and dim sum', icon: 'Soup' },
+  { name: 'Fast Food', description: 'Quick bites — burgers, shawarma, pizza, and fries', icon: 'Burger' },
+  { name: 'Drinks & Beverages', description: 'Refreshing drinks — zobo, palm wine, smoothies, and cocktails', icon: 'Wine' },
+  { name: 'Desserts & Snacks', description: 'Sweet treats and small chops — puff-puff, chin chin, and cakes', icon: 'Cake' },
+] as const;

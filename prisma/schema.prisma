@@ -1,0 +1,202 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  phone     String?
+  address   String?
+  city      String?
+  state     String?
+  avatar    String?
+  role      String   @default("CUSTOMER")  // CUSTOMER | ADMIN | RESTAURANT_OWNER
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders           Order[]
+  ownedRestaurants Restaurant[] // restaurants this user owns (RESTAURANT_OWNER role)
+
+  @@map("users")
+}
+
+model Category {
+  id          String       @id @default(cuid())
+  name        String       @unique
+  description String?
+  image       String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  restaurants Restaurant[]
+  foods       Food[]
+
+  @@map("categories")
+}
+
+model Restaurant {
+  id             String    @id @default(cuid())
+  name           String
+  description    String?
+  email          String?
+  phone          String?
+  address        String?
+  city           String?
+  state          String?
+  openTime       String?
+  closeTime      String?
+  openDays       String?
+  image          String?
+  isActive       Boolean   @default(true)
+  isAcceptingOrders Boolean @default(true) // restaurant can be online but pause orders
+  categoryId     String
+  category       Category  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  ownerId        String?   // links to User with RESTAURANT_OWNER role
+  owner          User?     @relation(fields: [ownerId], references: [id])
+  commissionRate Float     @default(10) // platform commission percentage
+  bankName       String?
+  bankAccount    String?
+  bankHolder     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  foods     Food[]
+  subOrders SubOrder[]
+
+  @@map("restaurants")
+}
+
+model Food {
+  id           String     @id @default(cuid())
+  name         String
+  description  String?
+  price        Float
+  image        String?
+  isAvailable  Boolean    @default(true)
+  categoryId   String
+  category     Category   @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  restaurantId String
+  restaurant   Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  orderItems OrderItem[]
+
+  @@map("foods")
+}
+
+// Parent Order — the customer's overall order
+model Order {
+  id                   String               @id @default(cuid())
+  orderNumber          String               @unique
+  userId               String
+  user                 User                 @relation(fields: [userId], references: [id])
+  status               String               @default("PENDING") // derived from sub-orders
+  subtotal             Float
+  deliveryFee          Float                @default(0)
+  totalAmount          Float
+  paymentMethod        String               @default("PAYSTACK")
+  paymentStatus        String               @default("PENDING")
+  paystackRef          String?
+  deliveryAddress      String?
+  deliveryCity         String?
+  deliveryState        String?
+  customerPhone        String?
+  customerName         String?
+  deliveryInstructions String?
+  remark               String?
+  cancelReason         String?
+  refundNote           String?
+  cancelledAt          DateTime?
+  deliveredAt          DateTime?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  subOrders    SubOrder[]
+  statusHistory OrderStatusHistory[]
+
+  @@map("orders")
+}
+
+// SubOrder — per-restaurant fulfillment order (Glovo/Chowdeck model)
+model SubOrder {
+  id                 String    @id @default(cuid())
+  subOrderNumber     String    @unique
+  orderId            String
+  order              Order     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  restaurantId       String
+  restaurant         Restaurant @relation(fields: [restaurantId], references: [id])
+  status             String    @default("PENDING")
+  // PENDING → CONFIRMED → PREPARING → READY → ON_THE_WAY → DELIVERED
+  // PENDING → CANCELLED (rejected by restaurant)
+  subtotal           Float
+  deliveryFee        Float     @default(0)
+  commissionRate     Float     @default(10)
+  commissionAmount   Float     @default(0)
+  restaurantEarnings Float     @default(0)
+  estimatedPrepTime  Int?      // minutes
+  preparedAt         DateTime?
+  readyAt            DateTime?
+  pickedUpAt         DateTime?
+  deliveredAt        DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  items         OrderItem[]
+  statusHistory SubOrderStatusHistory[]
+
+  @@map("sub_orders")
+}
+
+// OrderItem now belongs to a SubOrder
+model OrderItem {
+  id          String   @id @default(cuid())
+  subOrderId  String
+  subOrder    SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  foodId      String
+  food        Food     @relation(fields: [foodId], references: [id])
+  foodName    String
+  foodImage   String?
+  quantity    Int      @default(1)
+  unitPrice   Float
+  totalPrice  Float
+
+  @@map("order_items")
+}
+
+// Parent order status history
+model OrderStatusHistory {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  status    String
+  remark    String?
+  changedBy String?
+  createdAt DateTime @default(now())
+
+  @@map("order_status_history")
+}
+
+// SubOrder status history — tracks who changed what and when
+model SubOrderStatusHistory {
+  id             String    @id @default(cuid())
+  subOrderId     String
+  subOrder       SubOrder  @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+  status         String
+  remark         String?
+  changedBy      String?   // userId of who made the change
+  changedByRole  String?   // CUSTOMER | RESTAURANT_OWNER | ADMIN | SYSTEM
+  createdAt      DateTime  @default(now())
+
+  @@map("sub_order_status_history")
+}

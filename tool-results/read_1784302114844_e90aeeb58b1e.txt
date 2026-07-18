@@ -1,0 +1,2002 @@
+     1→@import url(https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,300,400,600,700|Give+You+Glory);
+     2→
+     3→/*------------------------------------------------------------------
+     4→Theme Name: Foodpicky - Responsive Bootstrap Restaurants Directory template Online food ordering 
+     5→Version: 1.0
+     6→Author: codenpixel.com  
+     7→Contact: info@codenpixel.com
+     8→-------------------------------------------------------------------*/
+     9→
+    10→/* Table of Content
+    11→*****************************************************
+    12→
+    13→
+    14→01. General Properties
+    15→- Styling
+    16→- Buttons
+    17→- Inputs
+    18→- Forms
+    19→02. Main Nav
+    20→03. Header
+    21→04. Food items
+    22→05. Pricing
+    23→06. Map
+    24→
+    25→
+    26→*/
+    27→
+    28→body {
+    29→  background: rgba(252, 251, 249, 0.68);
+    30→  font-size: 16px;
+    31→  color: #4d4f56;
+    32→  font-weight: 400;
+    33→  overflow-x: hidden;
+    34→}
+    35→
+    36→/* ==========================
+    37→*   Typohraphy
+    38→============================*/
+    39→
+    40→.h1,
+    41→.h2,
+    42→.h3,
+    43→.h4,
+    44→.h5,
+    45→.h6,
+    46→h1,
+    47→h2,
+    48→h3,
+    49→h4,
+    50→h5,
+    51→h6 {
+    52→  font-family: "Source Sans Pro", sans-serif;
+    53→  color: #25282b;
+    54→}
+    55→
+    56→a {
+    57→  color: #5c4ac7;
+    58→}
+    59→
+    60→a:hover {
+    61→  text-decoration: none;
+    62→  color: #ef3b0e;
+    63→}
+    64→
+    65→.lead {
+    66→  font-size: 1.25rem;
+    67→  font-weight: 400;
+    68→  color: #404048;
+    69→}
+    70→
+    71→ul {
+    72→  list-style-type: none;
+    73→  padding: 0;
+    74→}
+    75→
+    76→hr {
+    77→  margin-top: 1rem;
+    78→  margin-bottom: 1rem;
+    79→  border: 0;
+    80→  border-top: 1px solid #eaebeb;
+    81→}
+    82→
+    83→/*==================================
+    84→* Bootstrap grid tweaks
+    85→*===================================*/
+    86→
+    87→.container {
+    88→  max-width: 1270px;
+    89→  width: 94%;
+    90→}
+    91→
+    92→/* Remove space from columns */
+    93→
+    94→.row.no-gutter {
+    95→  margin-left: 0;
+    96→  margin-right: 0;
+    97→}
+    98→
+    99→.row.no-gutter [class*="col-"]:not(:first-child),
+   100→.row.no-gutter [class*="col-"]:not(:last-child) {
+   101→  padding-right: 0;
+   102→  padding-left: 0;
+   103→}
+   104→
+   105→/*==================================
+   106→* Just simple warppers
+   107→*===================================*/
+   108→
+   109→.page-wrapper {
+   110→  padding-top: 68px;
+   111→  /* Used for inpper pages if navigation fixed to the top */
+   112→}
+   113→
+   114→.inner-page {
+   115→  margin-top: 30px;
+   116→  margin-bottom: 50px;
+   117→}
+   118→
+   119→/*==================================
+   120→* Foms
+   121→*===================================*/
+   122→
+   123→.custom-control-input:checked ~ .custom-control-indicator {
+   124→  color: #fff;
+   125→  background-color: #5c4ac7;
+   126→  margin-top: 0;
+   127→  padding: 10px;
+   128→  border-radius: 100%;
+   129→}
+   130→
+   131→.custom-checkbox .custom-control-indicator {
+   132→  border-radius: 100%;
+   133→}
+   134→
+   135→.custom-control-indicator {
+   136→  padding: 10px;
+   137→  background-color: #fff;
+   138→  box-shadow: 0 0 1px 3px rgba(93, 92, 99, 0.05);
+   139→  border: 1px solid rgba(116, 135, 150, 0.23);
+   140→}
+   141→
+   142→.custom-control-input:focus ~ .custom-control-indicator {
+   143→  -webkit-box-shadow: 0 0 0 0.075rem #fff, 0 0 0 0.2rem #5c4ac7;
+   144→  box-shadow: 0 0 0 0.075rem #fff, 0 0 0 0.2rem #5c4ac7;
+   145→}
+   146→
+   147→.custom-radio .custom-control-input:checked ~ .custom-control-indicator {
+   148→  background-image: url("data:image/svg+xml;charset=utf8,%3Csvg xmlns="http://www.w3.org/2000/svg" viewBox="0088"%3E%3Cpath fill="%23fff" d="M6.564.75l-3.593.612-1.538-1.55l04.262.9747.2582.193z"/%3E%3C/svg%3E");
+   149→}
+   150→
+   151→.custom-control-input:active ~ .custom-control-indicator {
+   152→  color: #fff;
+   153→  background-color: #5c4ac7;
+   154→}
+   155→
+   156→.custom-control-input:disabled ~ .custom-control-indicator {
+   157→  cursor: not-allowed;
+   158→  background-color: #eee;
+   159→}
+   160→
+   161→.custom-control-input:disabled ~ .custom-control-description {
+   162→  color: #76767;
+   163→}
+   164→
+   165→.custom-control {
+   166→  padding-left: 30px;
+   167→}
+   168→
+   169→.form-control {
+   170→  border: 1px solid #eaebeb;
+   171→  border-radius: 2px;
+   172→}
+   173→
+   174→.custom-select {
+   175→  line-height: 1;
+   176→}
+   177→
+   178→/* ==========================
+   179→*   Buttons
+   180→============================*/
+   181→
+   182→.form-control-lg,
+   183→.dropdown-menu,
+   184→.btn,
+   185→.btn-group-lg > .btn,
+   186→.btn-lg,
+   187→.img-rounded {
+   188→  border-radius: 2px;
+   189→}
+   190→
+   191→.btn {
+   192→  transition: all 0.4s;
+   193→}
+   194→
+   195→.btn-secondary {
+   196→  color: #373a3c;
+   197→  background-color: rgba(252, 251, 249, 0.68);
+   198→  border-color: #eaebeb;
+   199→}
+   200→
+   201→.btn-purple {
+   202→  color: #eaebeb;
+   203→  background-color: #5c4ac7;
+   204→  border-color: #eaebeb;
+   205→}
+   206→
+   207→.btn-purple:hover {
+   208→  color: #eaebeb;
+   209→  background-color: #4e3fa7;
+   210→  border-color: #eaebeb;
+   211→}
+   212→
+   213→.theme-btn {
+   214→  background-color: #5c4ac7;
+   215→  border-color: #5c4ac7;
+   216→  color: #fff;
+   217→}
+   218→
+   219→.theme-btn-dash {
+   220→  border: 2px dashed #5c4ac7;
+   221→  background-color: transparent;
+   222→  color: #5c4ac7;
+   223→}
+   224→
+   225→.theme-btn-dash:hover,
+   226→.theme-btn,
+   227→.theme-btn.btn-lg:hover,
+   228→.btn-secondary:hover {
+   229→  background-color: #5c4ac7;
+   230→  color: #fff;
+   231→  border: 1px solid #5c4ac7;
+   232→}
+   233→
+   234→.theme-btn-dash:hover {
+   235→  border: 2px solid #5c4ac7;
+   236→  color: #fff;
+   237→}
+   238→
+   239→.bg-white {
+   240→  background-color: #fff;
+   241→}
+   242→
+   243→.primary-color {
+   244→  color: #5c4ac7;
+   245→}
+   246→
+   247→/* ==========================
+   248→*   Helpers
+   249→============================*/
+   250→
+   251→.space-xs {
+   252→  padding-bottom: 15px;
+   253→  padding-top: 15px;
+   254→}
+   255→
+   256→.space-sm {
+   257→  padding-bottom: 30;
+   258→  padding-top: 30px;
+   259→}
+   260→
+   261→.space-md {
+   262→  padding-top: 90px;
+   263→  padding-bottom: 90px;
+   264→}
+   265→
+   266→.m-b-10 {
+   267→  margin-bottom: 10px;
+   268→}
+   269→
+   270→.m-b-20 {
+   271→  margin-bottom: 20px;
+   272→}
+   273→
+   274→.m-b-30 {
+   275→  margin-bottom: 30px;
+   276→}
+   277→
+   278→.m-t-10 {
+   279→  margin-top: 10px;
+   280→}
+   281→
+   282→.m-t-20 {
+   283→  margin-top: 20px;
+   284→}
+   285→
+   286→.m-t-30 {
+   287→  margin-top: 30px;
+   288→}
+   289→
+   290→.b-l {
+   291→  border-left: 1px solid #edeed;
+   292→}
+   293→
+   294→.b-r {
+   295→  border-left: 1px solid #edeed;
+   296→}
+   297→
+   298→.b-t {
+   299→  border-top: 1px solid #edeed;
+   300→}
+   301→
+   302→.b-b {
+   303→  border-bottom: 1px solid #edeed;
+   304→}
+   305→
+   306→.b-b-0 {
+   307→  border-bottom: none !important;
+   308→}
+   309→
+   310→.b-t-0 {
+   311→  border-top: none !important;
+   312→}
+   313→
+   314→.b-l-0 {
+   315→  border-left: none !important;
+   316→}
+   317→
+   318→.b-r-0 {
+   319→  border-right: none !important;
+   320→}
+   321→
+   322→.align-wrap {
+   323→  display: inline-table;
+   324→  min-height: 100%;
+   325→}
+   326→
+   327→.align-vertical {
+   328→  display: table-cell;
+   329→  vertical-align: middle;
+   330→}
+   331→
+   332→.font-white {
+   333→  color: #fff;
+   334→}
+   335→
+   336→/* ============================
+   337→* PAGINATION
+   338→==============================*/
+   339→
+   340→.page-item.disabled .page-link,
+   341→.page-item.disabled .page-link:focus,
+   342→.page-item.disabled .page-link:hover {
+   343→  border-color: #eaebeb;
+   344→}
+   345→
+   346→.page-link {
+   347→  color: inherit;
+   348→  background-color: #fff;
+   349→  border: 1px solid #eaebeb;
+   350→}
+   351→
+   352→.page-item.active .page-link,
+   353→.page-item.active .page-link:focus,
+   354→.page-item.active .page-link:hover {
+   355→  background-color: #5c4ac7;
+   356→  border-color: #5c4ac7;
+   357→}
+   358→
+   359→/* ==========================
+   360→*   Header and navigation
+   361→============================*/
+   362→
+   363→#header {
+   364→  position: fixed;
+   365→  width: 100%;
+   366→  border: 0;
+   367→  z-index: 99;
+   368→}
+   369→
+   370→.nav-fixed {
+   371→  position: fixed;
+   372→  width: 100%;
+   373→  z-index: 10;
+   374→}
+   375→
+   376→.navbar {
+   377→  background-image: url("../images/menu-bg.jpg");
+   378→  padding: 0.95rem 1rem;
+   379→  border-radius: 0;
+   380→}
+   381→
+   382→.navbar-nav .nav-item {
+   383→  padding-left: 10px;
+   384→}
+   385→
+   386→.navbar-dark .navbar-toggler {
+   387→  background-image: none;
+   388→  border-color: transparent;
+   389→}
+   390→
+   391→@media (max-width: 62em) {
+   392→  .navbar-nav {
+   393→    padding-top: 0.425rem;
+   394→    padding-left: 0.75rem;
+   395→  }
+   396→  .navbar-nav .nav-item {
+   397→    float: none;
+   398→  }
+   399→  .navbar-brand {
+   400→    float: right;
+   401→  }
+   402→  .navbar-brand,
+   403→  .navbar-nav .nav-item {
+   404→    display: block;
+   405→  }
+   406→  .navbar-nav .nav-item + .nav-item {
+   407→    margin-left: 0;
+   408→  }
+   409→  .dropdown-menu {
+   410→    position: relative;
+   411→    float: none;
+   412→    background-color: transparent;
+   413→  }
+   414→  .dropdown-menu a {
+   415→    color: #fff;
+   416→  }
+   417→}
+   418→
+   419→.headroom--pinned {
+   420→  display: block;
+   421→}
+   422→
+   423→.headroom--unpinned {
+   424→  display: none;
+   425→}
+   426→
+   427→.navbar-fixed-top {
+   428→  position: fixed;
+   429→}
+   430→
+   431→.navbar-toggler {
+   432→  padding: 4px 0;
+   433→  font-size: 1.25rem;
+   434→  line-height: 1;
+   435→  background: 0 0;
+   436→  border: 1px solid transparent;
+   437→  color: #5c4ac7;
+   438→  border-radius: 2px;
+   439→}
+   440→
+   441→/********* top links part ***********/
+   442→
+   443→.top-links {
+   444→  padding: 15px 0;
+   445→  border-bottom: 1px solid #eaebeb;
+   446→}
+   447→
+   448→.top-links ul {
+   449→  margin-bottom: 0;
+   450→}
+   451→
+   452→.link-item a {
+   453→  font-size: 12px;
+   454→  color: #414551;
+   455→}
+   456→
+   457→.link-item.active span {
+   458→  background-color: #5c4ac7;
+   459→  color: #fff;
+   460→}
+   461→
+   462→.links {
+   463→  display: block;
+   464→}
+   465→
+   466→.links span {
+   467→  border: 1px solid #eaebeb;
+   468→  border-radius: 100px;
+   469→  width: 32px;
+   470→  height: 32px;
+   471→  color: #3a3e47;
+   472→  font-weight: 600;
+   473→  display: inline-block;
+   474→  margin-right: 18px;
+   475→  text-align: center;
+   476→  line-height: 28px;
+   477→  -webkit-transition: all 0.3s;
+   478→  transition: all 0.3s;
+   479→}
+   480→
+   481→.links li:hover span {
+   482→  background-color: #e8500e;
+   483→  color: #fff;
+   484→}
+   485→
+   486→@media (max-width: 800px) {
+   487→  .top-links {
+   488→    display: none;
+   489→  }
+   490→}
+   491→
+   492→/* ==========================
+   493→*   Hero
+   494→============================*/
+   495→
+   496→.hero {
+   497→  padding-top: 12%;
+   498→  /* padding-bottom: 10%; */
+   499→  padding-bottom: 6%;
+   500→  text-align: center;
+   501→  position: relative;
+   502→}
+   503→
+   504→.hero h1 {
+   505→  font-family: "Give You Glory", cursive;
+   506→  color: #fff;
+   507→  font-size: 3.7em;
+   508→  font-weight: 700;
+   509→}
+   510→
+   511→.hero:before {
+   512→  content: "";
+   513→  display: block;
+   514→  height: 100%;
+   515→  position: absolute;
+   516→  top: 0;
+   517→  left: 0;
+   518→  width: 100%;
+   519→  z-index: 1;
+   520→  background-color: rgba(7, 6, 29, 0.37);
+   521→}
+   522→
+   523→.hero .hero-inner {
+   524→  position: relative;
+   525→  z-index: 1;
+   526→}
+   527→
+   528→/* ==========================
+   529→*   Hero steps
+   530→============================*/
+   531→
+   532→.step-item {
+   533→  display: inline-block;
+   534→  margin: 0 40px 0;
+   535→  position: relative;
+   536→}
+   537→
+   538→.banner-form {
+   539→  margin-bottom: 60px;
+   540→  display: block;
+   541→  margin-top: 20px;
+   542→}
+   543→
+   544→.step-item svg {
+   545→  display: inline-block;
+   546→  width: 34px;
+   547→  height: 34px;
+   548→}
+   549→
+   550→.step-item img {
+   551→  display: block;
+   552→  margin: 0 auto 15px;
+   553→}
+   554→
+   555→.step-item h4 {
+   556→  font-family: "Give You Glory", cursive;
+   557→  color: #fff;
+   558→  font-size: 21px;
+   559→}
+   560→
+   561→.step-item h4 span {
+   562→  color: #5c4ac7;
+   563→}
+   564→
+   565→.step1:after,
+   566→.step2:after {
+   567→  position: absolute;
+   568→  content: "";
+   569→  right: -58%;
+   570→  top: -20%;
+   571→  width: 130px;
+   572→  height: 32px;
+   573→  background: url(../images/arrow.png);
+   574→}
+   575→
+   576→.step2:after {
+   577→  background: url(../images/arrow-dotted.png);
+   578→  height: 25px;
+   579→  right: -95%;
+   580→  top: -15%;
+   581→}
+   582→
+   583→@media (max-width: 568px) and (min-width: 280px) {
+   584→  .step1:after,
+   585→  .step2:after {
+   586→    display: none;
+   587→  }
+   588→  .hero h1 {
+   589→    font-size: 2.2em;
+   590→    padding-top: 75px;
+   591→  }
+   592→}
+   593→
+   594→@media (min-width: 768px) and (max-width: 991px) {
+   595→  .step-item {
+   596→    margin: 0 30px 0;
+   597→  }
+   598→}
+   599→
+   600→/* ==========================
+   601→*   Detect location
+   602→============================*/
+   603→
+   604→.location-match {
+   605→  padding: 20px 0;
+   606→  border-bottom: 1px solid #e6e6e6;
+   607→}
+   608→
+   609→.location-match span {
+   610→  font-weight: 600;
+   611→}
+   612→
+   613→.location-match a {
+   614→  color: #5c4ac7;
+   615→}
+   616→
+   617→.location-match a:hover {
+   618→  color: #43434c;
+   619→}
+   620→
+   621→/* ==========================
+   622→*  Popular block
+   623→============================*/
+   624→
+   625→.popular {
+   626→  padding: 70px 0 90px;
+   627→  background-size: 100%;
+   628→}
+   629→
+   630→.food-item-wrap {
+   631→  border: 1px solid #eaebeb;
+   632→  border-radius: 2px;
+   633→  overflow: hidden;
+   634→  margin-bottom: 30px;
+   635→  background: #fafaf8;
+   636→}
+   637→
+   638→.food-item-wrap h5 a {
+   639→  color: #25282b;
+   640→  font-size: 21px;
+   641→  font-weight: 600;
+   642→}
+   643→
+   644→.food-item-wrap .title h3 {
+   645→  font-size: 16px;
+   646→  margin-bottom: 35px;
+   647→  color: #414551;
+   648→  line-height: 21px;
+   649→  font-weight: 300;
+   650→}
+   651→
+   652→.food-item-wrap .price {
+   653→  font-size: 21px;
+   654→  font-weight: 700;
+   655→  color: #000;
+   656→  margin-top: 4px;
+   657→  display: inline-block;
+   658→}
+   659→
+   660→.food-item-wrap .product-name {
+   661→  margin-bottom: 20px;
+   662→}
+   663→
+   664→.food-item-wrap .content {
+   665→  padding: 25px 15px 35px;
+   666→}
+   667→
+   668→.food-item-wrap .restaurant-block {
+   669→  border-top: 1px solid #eaebeb;
+   670→  float: left;
+   671→  width: 100%;
+   672→}
+   673→
+   674→.food-item-wrap .right-text {
+   675→  margin-left: 10px;
+   676→}
+   677→
+   678→.food-item-wrap .right-text a {
+   679→  display: block;
+   680→}
+   681→
+   682→.food-item-wrap .left {
+   683→  float: left;
+   684→  padding: 8px 15px;
+   685→}
+   686→
+   687→.food-item-wrap .left img {
+   688→  padding-top: 3px;
+   689→}
+   690→
+   691→@media (min-width: 320px) and (max-width: 568px) {
+   692→  .food-item-wrap .left {
+   693→    float: left;
+   694→    padding: 10px;
+   695→  }
+   696→  .food-item .left img {
+   697→    width: 45px;
+   698→  }
+   699→  .food-item-wrap .right-text {
+   700→    font-size: 13px;
+   701→  }
+   702→}
+   703→
+   704→.food-item-wrap .right {
+   705→  padding: 10px 0;
+   706→}
+   707→
+   708→.food-item-wrap .right-like-part {
+   709→  border-left: 1px solid #eaebeb;
+   710→  padding: 25px 15px;
+   711→  font-size: 13px;
+   712→}
+   713→
+   714→@media (min-width: 280px) and (max-width: 580px) {
+   715→  .food-item-wrap .right-like-part {
+   716→    padding: 24px 10px;
+   717→    font-size: 10px;
+   718→  }
+   719→}
+   720→
+   721→.food-item-wrap .right-like-part img {
+   722→  vertical-align: middle;
+   723→  margin-right: 5px;
+   724→}
+   725→
+   726→.food-item-wrap .right-text a {
+   727→  color: #25282b;
+   728→  font-weight: 400;
+   729→}
+   730→
+   731→.food-item-wrap .right-text span,
+   732→.food-item-wrap .right-like-part,
+   733→.food-item-wrap .right-like-part span {
+   734→  font-weight: 300;
+   735→  color: #748796;
+   736→}
+   737→
+   738→.food-item-wrap .figure-wrap {
+   739→  position: relative;
+   740→  height: 210px;
+   741→}
+   742→
+   743→.food-item-wrap .food-item-wrap figure {
+   744→  position: relative;
+   745→  overflow: hidden;
+   746→  margin-bottom: 15px;
+   747→}
+   748→
+   749→.food-item-wrap .food-item-wrap figure img {
+   750→  width: 100%;
+   751→}
+   752→
+   753→.food-item-wrap .figure-wrap:after {
+   754→  position: absolute;
+   755→  bottom: -1px;
+   756→  left: 0;
+   757→  content: "";
+   758→  background: url(../images/zig-zag.png);
+   759→  width: 100%;
+   760→  height: 5px;
+   761→}
+   762→
+   763→.food-item-wrap:hover h5 > a,
+   764→.food-item-wrap:hover .right-text > a {
+   765→  color: #5c4ac7;
+   766→}
+   767→
+   768→.food-item-wrap .figure-text {
+   769→  position: absolute;
+   770→  top: 0;
+   771→  padding: 13px 28px 18px 18px;
+   772→  width: 100%;
+   773→  height: 100%;
+   774→}
+   775→
+   776→.food-item-wrap .figure-text .bottom {
+   777→  position: absolute;
+   778→  bottom: 25px;
+   779→  float: left;
+   780→  width: 87%;
+   781→}
+   782→
+   783→.food-item-wrap .review {
+   784→  margin-top: 5px;
+   785→  font-size: 10px;
+   786→  text-transform: uppercase;
+   787→}
+   788→
+   789→.food-item-wrap .distance {
+   790→  background: #5c4ac7;
+   791→  border-radius: 3px;
+   792→  color: #fff;
+   793→  font-size: 12px;
+   794→  padding: 0 10px;
+   795→  display: inline-block;
+   796→  position: absolute;
+   797→  top: 10px;
+   798→  left: 20px;
+   799→}
+   800→
+   801→.food-item-wrap .rating i {
+   802→  color: #ffd953;
+   803→  font-size: 16px;
+   804→}
+   805→
+   806→.food-item-wrap .rating .fa-star-o {
+   807→  font-size: 17px;
+   808→}
+   809→
+   810→.food-item-wrap .rating {
+   811→  position: absolute;
+   812→  bottom: 30px;
+   813→  left: 20px;
+   814→}
+   815→
+   816→.food-item-wrap .review {
+   817→  right: 30px;
+   818→  position: absolute;
+   819→  bottom: 30px;
+   820→}
+   821→
+   822→.food-item-wrap .review a {
+   823→  color: #fff;
+   824→}
+   825→
+   826→.food-item-wrap .left-sidebar,
+   827→.food-item-wrap .right-sidebar {
+   828→  width: 300px;
+   829→}
+   830→
+   831→.food-item-wrap .lf-ghost {
+   832→  width: 395px !important;
+   833→  float: left;
+   834→}
+   835→
+   836→@media (max-width: 543px) {
+   837→  ...;
+   838→}
+   839→
+   840→@media (min-width: 544px) and (max-width: 767px) {
+   841→  .food-item-wrap .right-text {
+   842→    margin: 5px 10px;
+   843→    font-size: 14px;
+   844→    line-height: 20px;
+   845→  }
+   846→  .food-item-wrap .right-like-part {
+   847→    width: 100%;
+   848→    padding: 5px 10px;
+   849→    background: #fff;
+   850→    border: 0;
+   851→    border-top: 1px solid #eaebeb;
+   852→    text-align: center;
+   853→  }
+   854→}
+   855→
+   856→@media (min-width: 768px) and (max-width: 991px) {
+   857→  .food-item-wrap .restaurant-block {
+   858→    text-align: center;
+   859→  }
+   860→  .food-item-wrap .left {
+   861→    float: none;
+   862→  }
+   863→  .food-item-wrap .pull-left {
+   864→    float: none;
+   865→  }
+   866→  .food-item-wrap .right-text span,
+   867→  .food-item-wrap .right-like-part,
+   868→  .food-item-wrap .right-like-part span {
+   869→    width: 100%;
+   870→  }
+   871→  .right-like-part.pull-right {
+   872→    background-color: #fff;
+   873→    border: 0;
+   874→    border-top: 1px solid #eaebeb;
+   875→    padding: 10px;
+   876→  }
+   877→  .food-item-wrap .price-btn-block {
+   878→    text-align: center;
+   879→  }
+   880→  .food-item-wrap .price-btn-block .price {
+   881→    margin-bottom: 15px;
+   882→    display: block;
+   883→  }
+   884→  .food-item-wrap .price-btn-block .btn {
+   885→    float: none;
+   886→  }
+   887→}
+   888→
+   889→@media (min-width: 992px) and (max-width: 1199px) {
+   890→  .food-item-wrap .left {
+   891→    padding: 10px;
+   892→    font-size: 11px;
+   893→    line-height: 20px;
+   894→  }
+   895→}
+   896→
+   897→@media (min-width: 1200px) {
+   898→  ...;
+   899→}
+   900→
+   901→/*============================================
+   902→* Modal 
+   903→=============================================*/
+   904→
+   905→.cart-addon .food-item {
+   906→  margin-bottom: 20px;
+   907→  border-bottom: 1px solid #ededed;
+   908→  padding: 2px 0 15px;
+   909→}
+   910→
+   911→.cart-addon .food-item:last-of-type {
+   912→  border-bottom: none;
+   913→}
+   914→
+   915→.cart-addon .food-item .item-img img {
+   916→  max-width: 70px;
+   917→}
+   918→
+   919→.cart-addon .food-item .rest-descr {
+   920→  margin-left: 80px;
+   921→}
+   922→
+   923→.cart-addon .food-item h6 {
+   924→  /* margin: 0 0 2px 0; */
+   925→}
+   926→
+   927→.cart-addon .food-item h6 a {
+   928→  font-size: 16px;
+   929→  color: #4d4f56;
+   930→  display: block;
+   931→  margin: 4px 0 0 0;
+   932→  line-height: 20px;
+   933→}
+   934→
+   935→.cart-addon .food-item .price {
+   936→  font-weight: 600;
+   937→  margin-top: 15px;
+   938→  display: block;
+   939→  color: #25282b;
+   940→}
+   941→
+   942→.cart-addon .food-item .form-control {
+   943→  margin-top: 8px;
+   944→}
+   945→
+   946→button.close {
+   947→  padding: 0;
+   948→  cursor: pointer;
+   949→  background: 0 0;
+   950→  border: 0;
+   951→  -webkit-appearance: none;
+   952→  right: -15px;
+   953→  position: absolute;
+   954→  top: -15px;
+   955→  background-color: #5c4ac7;
+   956→  opacity: 1;
+   957→  width: 30px;
+   958→  height: 30px;
+   959→  color: #fff;
+   960→  text-shadow: none;
+   961→  font-size: 14px;
+   962→  display: block;
+   963→}
+   964→
+   965→button.close span {
+   966→  display: block;
+   967→}
+   968→
+   969→/*-----------------------------------  
+   970→How it works section
+   971→-----------------------------------*/
+   972→
+   973→.how-it-works {
+   974→  background-image: url(../images/city.png), url(../images/pattern.png);
+   975→  background-repeat: repeat-x, repeat;
+   976→  background-position: bottom, center;
+   977→  padding: 90px 0;
+   978→  position: relative;
+   979→}
+   980→
+   981→.how-it-works .text-xs-center > h2 {
+   982→  color: #d8bea5;
+   983→  margin-bottom: 50px;
+   984→}
+   985→
+   986→.how-it-works-wrap h2 {
+   987→  margin-bottom: 10px;
+   988→  font-size: 21px;
+   989→}
+   990→
+   991→.how-it-works-wrap > p {
+   992→  font-weight: 300;
+   993→}
+   994→
+   995→.how-it-works-steps {
+   996→  position: relative;
+   997→  padding: 0 2.1rem;
+   998→}
+   999→
+  1000→.how-it-works .how-middle {
+  1001→  margin-top: 70px;
+  1002→}
+  1003→
+  1004→.how-it-works p.pay-info {
+  1005→  font-size: 16px;
+  1006→  color: #d8bea5;
+  1007→  margin-top: 25px;
+  1008→  text-align: center;
+  1009→}
+  1010→
+  1011→.how-it-works h3 {
+  1012→  color: #fff;
+  1013→}
+  1014→
+  1015→/*-----------------------------------  
+  1016→Steps
+  1017→-----------------------------------*/
+  1018→
+  1019→.how-it-works p {
+  1020→  color: #9c9da5;
+  1021→}
+  1022→
+  1023→.step .icon {
+  1024→  position: relative;
+  1025→  width: 86px;
+  1026→  height: 86px;
+  1027→  margin: 10px auto 20px;
+  1028→  line-height: 78px;
+  1029→  text-align: center;
+  1030→  border: 1px solid #fff;
+  1031→  border-radius: 50%;
+  1032→}
+  1033→
+  1034→.step .icon:before {
+  1035→  content: attr(data-step);
+  1036→  position: absolute;
+  1037→  top: -10px;
+  1038→  left: 5px;
+  1039→  display: block;
+  1040→  width: 32px;
+  1041→  height: 32px;
+  1042→  line-height: 38px;
+  1043→  background-color: #5c4ac7;
+  1044→  border-radius: 50%;
+  1045→  font-size: 1.5em;
+  1046→  font-family: "Give You Glory", cursive;
+  1047→  font-weight: 700;
+  1048→  color: #fff;
+  1049→}
+  1050→
+  1051→.step .icon img,
+  1052→.step .icon svg {
+  1053→  display: inline-block;
+  1054→  vertical-align: middle;
+  1055→  width: 34px;
+  1056→  height: 34px;
+  1057→}
+  1058→
+  1059→.how-it-works .step-2 {
+  1060→  padding-top: 20%;
+  1061→}
+  1062→
+  1063→.col1:after {
+  1064→  position: absolute;
+  1065→  content: "";
+  1066→  right: -21%;
+  1067→  top: 15%;
+  1068→  width: 185px;
+  1069→  height: 34px;
+  1070→  background: url(../images/arrow-big.png) no-repeat;
+  1071→}
+  1072→
+  1073→.col2:after {
+  1074→  position: absolute;
+  1075→  content: "";
+  1076→  right: -16%;
+  1077→  top: 11%;
+  1078→  width: 175px;
+  1079→  height: 34px;
+  1080→  background: url(../images/arrow-big-dotted.png) no-repeat;
+  1081→}
+  1082→
+  1083→.how-it-works-solution {
+  1084→  margin-bottom: 26px;
+  1085→}
+  1086→
+  1087→@media (max-width: 543px) {
+  1088→  .col1:after,
+  1089→  .col2:after {
+  1090→    display: none;
+  1091→  }
+  1092→}
+  1093→
+  1094→@media (min-width: 544px) and (max-width: 767px) {
+  1095→  .col1:after,
+  1096→  .col2:after {
+  1097→    display: none;
+  1098→  }
+  1099→}
+  1100→
+  1101→@media (min-width: 768px) and (max-width: 991px) {
+  1102→  .col1:after,
+  1103→  .col2:after {
+  1104→    display: none;
+  1105→  }
+  1106→}
+  1107→
+  1108→@media (min-width: 992px) and (max-width: 1199px) {
+  1109→  .col1:after,
+  1110→  .col2:after {
+  1111→    right: -30%;
+  1112→  }
+  1113→}
+  1114→
+  1115→@media (min-width: 1200px) {
+  1116→  ...;
+  1117→}
+  1118→
+  1119→/****** featured restaurants block *******/
+  1120→
+  1121→.featured-restaurants {
+  1122→  padding: 100px 0 20px;
+  1123→  position: relative;
+  1124→}
+  1125→
+  1126→@media (min-width: 280px) and (max-width: 580px) {
+  1127→  .featured-restaurants {
+  1128→    padding: 50px 0 20px;
+  1129→    position: relative;
+  1130→  }
+  1131→  .featured-restaurants .title-block {
+  1132→    margin-bottom: 15px;
+  1133→  }
+  1134→  .featured-restaurants .title-block h4 {
+  1135→    font-size: 21px;
+  1136→  }
+  1137→}
+  1138→
+  1139→@media (min-width: 280px) and (max-width: 580px) {
+  1140→  .featured-restaurants:before {
+  1141→    display: none;
+  1142→  }
+  1143→}
+  1144→
+  1145→.featured-restaurants .restaurant-wrap {
+  1146→  border: 1px solid #eaebeb;
+  1147→  border-radius: 3px;
+  1148→  padding: 15px;
+  1149→  background: #fafaf8;
+  1150→  float: left;
+  1151→  width: 100%;
+  1152→}
+  1153→
+  1154→.featured-restaurants .restaurant-logo {
+  1155→  border-radius: 3px;
+  1156→}
+  1157→
+  1158→.featured-restaurants .restaurant-logo img {
+  1159→  width: 95px;
+  1160→  height: auto;
+  1161→  border: 1px solid #eaebeb;
+  1162→}
+  1163→
+  1164→@media (min-width: 320px) and (max-width: 543px) {
+  1165→  .restaurant-wrap {
+  1166→    /* text-align:center */
+  1167→  }
+  1168→  .featured-restaurants .restaurant-logo img {
+  1169→    width: 85px;
+  1170→    margin-bottom: 15px;
+  1171→  }
+  1172→}
+  1173→
+  1174→.featured-restaurants .restaurant-wrap h5 {
+  1175→  margin-top: 5px;
+  1176→  font-weight: 600;
+  1177→}
+  1178→
+  1179→.featured-restaurants .restaurant-wrap h5 a {
+  1180→  color: #25282b;
+  1181→}
+  1182→
+  1183→.featured-restaurants .bottom-part {
+  1184→  margin-top: 5px;
+  1185→}
+  1186→
+  1187→.featured-restaurants .cost,
+  1188→.featured-restaurants .mins,
+  1189→.featured-restaurants .ratings {
+  1190→  font-size: 12px;
+  1191→  display: inline-block;
+  1192→}
+  1193→
+  1194→.featured-restaurants .cost,
+  1195→.featured-restaurants .mins {
+  1196→  margin-right: 1rem;
+  1197→}
+  1198→
+  1199→.featured-restaurants .ratings span i {
+  1200→  color: #5c4ac7;
+  1201→}
+  1202→
+  1203→.featured-restaurants .ratings .fa-star-o {
+  1204→}
+  1205→
+  1206→.restaurants-filter ul li {
+  1207→  display: inline-block;
+  1208→  padding: 0 0.5rem;
+  1209→}
+  1210→
+  1211→.featured-restaurants .restaurants-filter ul li a {
+  1212→  font-weight: 400;
+  1213→  color: #414551;
+  1214→  font-size: 16px;
+  1215→  text-transform: capitalize;
+  1216→}
+  1217→
+  1218→.featured-restaurants .restaurants-filter ul li a:hover {
+  1219→  color: #e8500e;
+  1220→}
+  1221→
+  1222→@media (min-width: 320px) and (max-width: 480px) {
+  1223→  .restaurants-filter {
+  1224→    float: none;
+  1225→  }
+  1226→  .restaurants-filter ul li {
+  1227→    padding: 0 0.5rem;
+  1228→  }
+  1229→}
+  1230→
+  1231→.featured-restaurants .featured-restaurants h4 {
+  1232→  margin-bottom: 45px;
+  1233→}
+  1234→
+  1235→.featured-restaurants .restaurant-listing {
+  1236→  margin-bottom: 50px;
+  1237→  margin-top: 25px;
+  1238→}
+  1239→
+  1240→.featured-restaurants .single-restaurant {
+  1241→  margin-bottom: 30px;
+  1242→}
+  1243→
+  1244→.add-restaurants {
+  1245→  background: #fafaf8;
+  1246→  border: 1px solid #eaebeb;
+  1247→  padding: 35px 10px 23px;
+  1248→  border-radius: 2px;
+  1249→}
+  1250→
+  1251→.add-restaurants p strong {
+  1252→  font-weight: 600;
+  1253→  color: #5c4ac7;
+  1254→}
+  1255→
+  1256→@media (min-width: 320px) and (max-width: 543px) {
+  1257→  .featured-restaurants .restaurant-wrap {
+  1258→    margin-bottom: 10px;
+  1259→  }
+  1260→  .add-restaurants {
+  1261→    text-align: center;
+  1262→  }
+  1263→  .add-restaurants a.btn.theme-btn {
+  1264→    display: block;
+  1265→  }
+  1266→}
+  1267→
+  1268→@media (min-width: 544px) and (max-width: 767px) {
+  1269→}
+  1270→
+  1271→@media (min-width: 768px) and (max-width: 991px) {
+  1272→  .featured-restaurants .restaurant-wrap {
+  1273→    text-align: center;
+  1274→  }
+  1275→}
+  1276→
+  1277→@media (min-width: 992px) and (max-width: 1199px) {
+  1278→}
+  1279→
+  1280→@media (min-width: 1200px) {
+  1281→}
+  1282→
+  1283→/*-----------------------------------  
+  1284→App section
+  1285→-----------------------------------*/
+  1286→
+  1287→.app-section {
+  1288→  padding-top: 35px;
+  1289→  position: relative;
+  1290→}
+  1291→
+  1292→.app-section:after {
+  1293→  content: "";
+  1294→  background: url(../images/city-2.png) center bottom;
+  1295→  background-color: #5c4ac7;
+  1296→  display: block;
+  1297→  position: absolute;
+  1298→  top: 100px;
+  1299→  left: 0;
+  1300→  right: 0;
+  1301→  bottom: 0;
+  1302→  z-index: 1;
+  1303→  background-repeat: repeat-x;
+  1304→}
+  1305→
+  1306→.app-wrap {
+  1307→  position: relative;
+  1308→  z-index: 2;
+  1309→}
+  1310→
+  1311→@media (min-width: 280px) and (max-width: 568px) {
+  1312→  .app-wrap {
+  1313→    padding-bottom: 30px;
+  1314→  }
+  1315→}
+  1316→
+  1317→.app-wrap figure {
+  1318→  margin: 0;
+  1319→  text-align: center;
+  1320→}
+  1321→
+  1322→.app-wrap .left-text {
+  1323→  padding-top: 110px;
+  1324→}
+  1325→
+  1326→.app-wrap .left-text h3,
+  1327→.app-wrap .left-text p {
+  1328→  color: #fff;
+  1329→}
+  1330→
+  1331→/* ==========================
+  1332→*  Download app buttons
+  1333→============================*/
+  1334→
+  1335→.app-btn {
+  1336→  color: #ffffff;
+  1337→  float: left;
+  1338→  margin-right: 15px;
+  1339→  background: #81858b;
+  1340→  margin-top: 5px;
+  1341→  -webkit-border-radius: 3px;
+  1342→  -moz-border-radius: 3px;
+  1343→  border-radius: 2px;
+  1344→  transition: all 0.3s;
+  1345→}
+  1346→
+  1347→.app-btn i {
+  1348→  font-size: 38px;
+  1349→  line-height: 50px;
+  1350→  margin: 0px;
+  1351→  padding: 0 18px;
+  1352→}
+  1353→
+  1354→.app-btn .pull-right {
+  1355→  padding: 8px 25px 8px 10px;
+  1356→}
+  1357→
+  1358→.app-btn .text {
+  1359→  display: block;
+  1360→  font-size: 12px;
+  1361→  line-height: 1;
+  1362→}
+  1363→
+  1364→.app-btn:hover,
+  1365→.app-btn:active,
+  1366→.app-btn:focus {
+  1367→  color: #ffffff;
+  1368→  background: #111111;
+  1369→}
+  1370→
+  1371→.android-button {
+  1372→  background: #82b21c;
+  1373→}
+  1374→
+  1375→@media (min-width: 348px) and (max-width: 767px) {
+  1376→  .app-section {
+  1377→    padding: 55px 0;
+  1378→  }
+  1379→  .text-img-block figure {
+  1380→    display: none;
+  1381→  }
+  1382→}
+  1383→
+  1384→@media (min-width: 768px) and (max-width: 991px) {
+  1385→  .app-wrap .left-text {
+  1386→    padding-top: 100px;
+  1387→    font-size: 80%;
+  1388→  }
+  1389→  .app-btn i {
+  1390→    font-size: 28px;
+  1391→    line-height: 41px;
+  1392→    margin: 0px;
+  1393→    padding: 0 18px;
+  1394→  }
+  1395→  .app-btn {
+  1396→    padding-right: 5px;
+  1397→  }
+  1398→  .app-btn .pull-right {
+  1399→    padding: 7px 14px 0 5px;
+  1400→  }
+  1401→  .app-btn i {
+  1402→    padding: 0 10px;
+  1403→  }
+  1404→}
+  1405→
+  1406→/* ==========================
+  1407→*  Footer
+  1408→============================*/
+  1409→
+  1410→footer {
+  1411→  background: url(../images/pattern.png) center repeat;
+  1412→  padding: 90px 0;
+  1413→  z-index: 1;
+  1414→  position: relative;
+  1415→}
+  1416→
+  1417→.payment-options ul li {
+  1418→  display: inline-block;
+  1419→  margin-right: 8px;
+  1420→}
+  1421→
+  1422→footer h5 {
+  1423→  color: #fff;
+  1424→  font-family: "Source Sans Pro", sans-serif;
+  1425→  margin-bottom: 15px;
+  1426→}
+  1427→
+  1428→.footer-logo-block img {
+  1429→  display: block;
+  1430→  margin-bottom: 15px;
+  1431→}
+  1432→
+  1433→footer p,
+  1434→footer,
+  1435→footer span {
+  1436→  font-weight: 300;
+  1437→  color: #9c9da5;
+  1438→}
+  1439→
+  1440→.address h5 a {
+  1441→  color: #5c4ac7;
+  1442→  font-size: 26px;
+  1443→  font-family: "Give You Glory", cursive;
+  1444→  margin-left: 20px;
+  1445→  font-weight: 600;
+  1446→}
+  1447→
+  1448→.address h5 a:hover {
+  1449→  color: #fff;
+  1450→}
+  1451→
+  1452→.popular-locations ul li {
+  1453→  display: inline-block;
+  1454→  width: 49%;
+  1455→}
+  1456→
+  1457→footer ul li {
+  1458→  margin-bottom: 6px;
+  1459→}
+  1460→
+  1461→footer ul li a {
+  1462→  color: #9c9da5;
+  1463→  transition: all 0.3s;
+  1464→}
+  1465→
+  1466→.how-it-works-links {
+  1467→  margin-bottom: 70px;
+  1468→}
+  1469→
+  1470→.address p {
+  1471→  margin-bottom: 35px;
+  1472→}
+  1473→
+  1474→footer ul li a:hover {
+  1475→  color: #5c4ac7;
+  1476→}
+  1477→
+  1478→footer li a {
+  1479→  line-height: 20px;
+  1480→  display: inline-block;
+  1481→}
+  1482→
+  1483→.payment-options ul {
+  1484→  margin-top: 10px;
+  1485→  float: left;
+  1486→  width: 100%;
+  1487→}
+  1488→
+  1489→@media (min-width: 320px) and (max-width: 768px) {
+  1490→  .footer-logo-block {
+  1491→    margin-bottom: 25px;
+  1492→  }
+  1493→}
+  1494→
+  1495→/* ==========================
+  1496→*  Inner pages
+  1497→============================*/
+  1498→
+  1499→.inner-page-hero {
+  1500→  padding-top: 5%;
+  1501→  padding-bottom: 5%;
+  1502→}
+  1503→
+  1504→/********* profile banner part ***********/
+  1505→
+  1506→.profile-banner figure img {
+  1507→  width: 100%;
+  1508→}
+  1509→
+  1510→.image-wrap {
+  1511→  border-radius: 2px;
+  1512→  padding: 10px;
+  1513→  float: left;
+  1514→  background: #fff;
+  1515→}
+  1516→
+  1517→.image-wrap figure {
+  1518→  background: #fff;
+  1519→  border-radius: 2px;
+  1520→  display: block;
+  1521→  overflow: hidden;
+  1522→  float: left;
+  1523→  margin-bottom: 0;
+  1524→}
+  1525→
+  1526→.image-wrap figure img {
+  1527→  max-width: 100%;
+  1528→  display: block;
+  1529→}
+  1530→
+  1531→.profile p {
+  1532→  color: #fff;
+  1533→}
+  1534→
+  1535→.banner figure {
+  1536→  margin-bottom: 0;
+  1537→}
+  1538→
+  1539→.profile-desc h6 a {
+  1540→  font-size: 26px;
+  1541→  line-height: 31px;
+  1542→  color: #fff;
+  1543→}
+  1544→
+  1545→.profile .right-text {
+  1546→}
+  1547→
+  1548→.profile-img {
+  1549→  width: 24.7%;
+  1550→}
+  1551→
+  1552→.profile .right-text span {
+  1553→  margin-bottom: 8px;
+  1554→  display: block;
+  1555→}
+  1556→
+  1557→.profile-desc h6 {
+  1558→  display: inline-block;
+  1559→  margin-right: 3rem;
+  1560→  margin-bottom: 10px;
+  1561→}
+  1562→
+  1563→.profile-desc a.btn {
+  1564→  display: inline-block;
+  1565→  padding: 3px 20px;
+  1566→  background-color: #82b21c;
+  1567→  vertical-align: text-bottom;
+  1568→  font-size: 13px;
+  1569→  color: #fff;
+  1570→}
+  1571→
+  1572→.profile-desc .right-text {
+  1573→  width: 100%;
+  1574→  border-right: 0;
+  1575→  color: rgba(255, 255, 255, 0.5);
+  1576→  margin-top: 30px;
+  1577→}
+  1578→
+  1579→.profile-desc .nav-item a {
+  1580→  color: #fff;
+  1581→}
+  1582→
+  1583→.profile-desc .nav-item.ratings a span i {
+  1584→  color: #ffd953;
+  1585→  font-size: 16px;
+  1586→}
+  1587→
+  1588→@media (min-width: 320px) and (max-width: 768px) {
+  1589→  .profile-desc .right-text {
+  1590→    margin-top: 0;
+  1591→  }
+  1592→  .profile-desc h6 {
+  1593→    margin-right: 0;
+  1594→  }
+  1595→  .image-wrap {
+  1596→    padding: 1px;
+  1597→    border-radius: 2px;
+  1598→    margin-bottom: 20px;
+  1599→  }
+  1600→  .profile-desc a.btn {
+  1601→    float: right;
+  1602→  }
+  1603→  .image-wrap img {
+  1604→    width: auto;
+  1605→  }
+  1606→  .profile-img {
+  1607→    width: 100%;
+  1608→  }
+  1609→}
+  1610→
+  1611→@media (min-width: 768px) and (max-width: 991px) {
+  1612→  .profile-desc .right-text {
+  1613→    margin-top: 0;
+  1614→  }
+  1615→}
+  1616→
+  1617→/********* breadcrumb part ***********/
+  1618→
+  1619→.breadcrumb {
+  1620→  background: transparent;
+  1621→  padding: 22px 0;
+  1622→  border-bottom: 1px solid #e6e6e6;
+  1623→}
+  1624→
+  1625→.breadcrumb ul li {
+  1626→  display: inline-block;
+  1627→  margin-right: 40px;
+  1628→  position: relative;
+  1629→}
+  1630→
+  1631→.breadcrumb ul li:before {
+  1632→  position: absolute;
+  1633→  left: -25px;
+  1634→  top: 0;
+  1635→  content: "/";
+  1636→}
+  1637→
+  1638→.breadcrumb ul li:first-child:before {
+  1639→  content: none;
+  1640→}
+  1641→
+  1642→.breadcrumb ul li a,
+  1643→.breadcrumb ul li {
+  1644→  color: #333366;
+  1645→}
+  1646→
+  1647→.breadcrumb ul,
+  1648→.breadcrumb {
+  1649→  margin-bottom: 0;
+  1650→}
+  1651→
+  1652→@media (min-width: 320px) and (max-width: 568px) {
+  1653→  .breadcrumb ul li {
+  1654→    display: inline-block;
+  1655→    margin-right: 15px;
+  1656→    position: relative;
+  1657→  }
+  1658→  .breadcrumb ul li:before {
+  1659→    display: none;
+  1660→  }
+  1661→}
+  1662→
+  1663→.result-show .dropdown button {
+  1664→  color: #333366;
+  1665→  font-size: 14px;
+  1666→  border: 0;
+  1667→}
+  1668→
+  1669→.result-show div i {
+  1670→  margin-left: 10px;
+  1671→  font-size: 22px;
+  1672→  vertical-align: middle;
+  1673→  color: #000;
+  1674→}
+  1675→
+  1676→.result-show {
+  1677→  padding: 7px 0 10px;
+  1678→  border-bottom: 1px solid #eaebeb;
+  1679→  color: #333366;
+  1680→  margin-bottom: 20px;
+  1681→}
+  1682→
+  1683→.result-show p {
+  1684→  padding: 0;
+  1685→  margin: 5px 0;
+  1686→}
+  1687→
+  1688→.sidebar {
+  1689→  border: 1px solid #eaebeb;
+  1690→  background: #fafaf8;
+  1691→  border-radius: 3px;
+  1692→}
+  1693→
+  1694→.sidebar-inner {
+  1695→  padding-left: 15px;
+  1696→  padding-right: 15px;
+  1697→}
+  1698→
+  1699→.sidebar-inner .sidebar input,
+  1700→.sidebar .input-group-btn .btn {
+  1701→  height: 55px;
+  1702→  border-left: 0;
+  1703→  border-right: 0;
+  1704→}
+  1705→
+  1706→.widget {
+  1707→  border: 1px solid #eaebeb;
+  1708→  background: #fafaf8;
+  1709→  border-radius: 3px;
+  1710→  margin-bottom: 20px;
+  1711→}
+  1712→
+  1713→.widget-heading {
+  1714→  padding: 15px;
+  1715→  color: #fff;
+  1716→  border-radius: 3px;
+  1717→  border-bottom: 1px solid #eaebeb;
+  1718→}
+  1719→
+  1720→.menu-widget .widget-heading {
+  1721→  border-bottom: none;
+  1722→}
+  1723→
+  1724→.widget-heading .widget-title {
+  1725→  font-size: 16px;
+  1726→  font-weight: 600;
+  1727→  float: left;
+  1728→  margin-top: 0;
+  1729→  margin-bottom: 0;
+  1730→  width: 100%;
+  1731→}
+  1732→
+  1733→.widget-heading .widget-title .btn {
+  1734→  padding: 0px 24px;
+  1735→}
+  1736→
+  1737→.widget-delivery .col-xs-6 {
+  1738→  padding: 25px 15px 20px;
+  1739→  background: #fff;
+  1740→  border-right: 1px solid #eaebeb;
+  1741→  display: -webkit-inline-box;
+  1742→  border-bottom: 1px solid #eaebeb;
+  1743→}
+  1744→
+  1745→.widget-delivery .col-xs-6:last-of-type {
+  1746→  border-right: 1px solid transparent;
+  1747→}
+  1748→
+  1749→.sidebar .widget-delivery .col-xs-6 {
+  1750→  border-bottom: none;
+  1751→}
+  1752→
+  1753→.sidebar-title {
+  1754→  padding: 15px 15px 15px;
+  1755→  background: #5c4ac7;
+  1756→  float: left;
+  1757→  width: 100%;
+  1758→}
+  1759→
+  1760→.sidebar-title h6 {
+  1761→  float: left;
+  1762→  margin-bottom: 0;
+  1763→  color: #fff;
+  1764→  font-size: 16px;
+  1765→  font-weight: 600;
+  1766→  line-height: 20px;
+  1767→}
+  1768→
+  1769→.sidebar-title i {
+  1770→  float: right;
+  1771→  color: #fff;
+  1772→  font-size: 15px;
+  1773→  margin-top: 3px;
+  1774→}
+  1775→
+  1776→.main-block ul li {
+  1777→  line-height: 28px;
+  1778→  font-weight: 300;
+  1779→  display: block;
+  1780→  border-bottom: 1px solid #eaebeb;
+  1781→  font-weight: 500;
+  1782→  color: #414551;
+  1783→}
+  1784→
+  1785→.main-block ul li a {
+  1786→  color: #414551;
+  1787→  display: block;
+  1788→  font-weight: 500;
+  1789→  padding: 15px;
+  1790→}
+  1791→
+  1792→.main-block ul {
+  1793→  float: left;
+  1794→  width: 100%;
+  1795→  margin-bottom: 0;
+  1796→}
+  1797→
+  1798→.main-block ul li:hover {
+  1799→  background: #fffdfd;
+  1800→}
+  1801→
+  1802→.main-block ul li:hover a {
+  1803→  color: #5c4ac7;
+  1804→}
+  1805→
+  1806→.main-block ul:hover li:last-child {
+  1807→  border-bottom: 1px solid transparent;
+  1808→  border-bottom: 1px solid #eaebeb;
+  1809→}
+  1810→
+  1811→.main-block ul li:first-of-type {
+  1812→  border-top: none;
+  1813→}
+  1814→
+  1815→a.more-link {
+  1816→  padding-left: 15px;
+  1817→  margin: 5px 0 25px;
+  1818→  float: left;
+  1819→}
+  1820→
+  1821→.block {
+  1822→  border-bottom: 1px solid #eaebeb;
+  1823→  margin-top: 30px;
+  1824→}
+  1825→
+  1826→.main-block form ul li {
+  1827→  padding: 15px;
+  1828→}
+  1829→
+  1830→.main-block .input-group input,
+  1831→.main-block .input-group-btn {
+  1832→  height: 55px;
+  1833→  border-left: none;
+  1834→}
+  1835→
+  1836→/* Food items */
+  1837→
+  1838→.menu-widget,
+  1839→.widget {
+  1840→  border: 1px solid #eaebeb;
+  1841→  background: #fafaf8;
+  1842→  border-radius: 2px;
+  1843→  position: relative;
+  1844→}
+  1845→
+  1846→.widget-body {
+  1847→  padding: 20px;
+  1848→}
+  1849→
+  1850→.panel {
+  1851→  margin-bottom: 15px;
+  1852→  border: 1px solid #dcdee3;
+  1853→  border-radius: 3px;
+  1854→  box-shadow: none;
+  1855→}
+  1856→
+  1857→.panel-heading {
+  1858→  padding: 15px;
+  1859→  border: none !important;
+  1860→  border-radius: 0;
+  1861→}
+  1862→
+  1863→.panel-heading i {
+  1864→  padding-right: 7px;
+  1865→  font-size: 14px;
+  1866→}
+  1867→
+  1868→.panel-title {
+  1869→  font-size: 16px;
+  1870→  font-weight: 600;
+  1871→  margin-top: 0;
+  1872→  margin-bottom: 0;
+  1873→  color: #25282b;
+  1874→}
+  1875→
+  1876→.panel-title a {
+  1877→  color: #25282b;
+  1878→}
+  1879→
+  1880→.panel .panel-body {
+  1881→  padding: 20px;
+  1882→}
+  1883→
+  1884→.list-check > li {
+  1885→  line-height: 24px;
+  1886→  position: relative;
+  1887→  margin-bottom: 10px;
+  1888→  padding-left: 23px;
+  1889→}
+  1890→
+  1891→.list-check > li:after {
+  1892→  font-family: FontAwesome;
+  1893→  position: absolute;
+  1894→  top: 1px;
+  1895→  left: 0;
+  1896→  content: "\f05d";
+  1897→  color: #7ab55c;
+  1898→  font-size: 18px;
+  1899→}
+  1900→
+  1901→.menu-widget .food-item {
+  1902→  padding: 15px;
+  1903→}
+  1904→
+  1905→.menu-widget .food-item:first-of-type {
+  1906→  border-bottom: none;
+  1907→}
+  1908→
+  1909→.menu-widget .food-item .restaurant-logo {
+  1910→  max-width: 100px;
+  1911→  height: auto;
+  1912→  display: block;
+  1913→}
+  1914→
+  1915→.menu-widget .food-item .restaurant-logo img {
+  1916→  max-width: 100%;
+  1917→  display: block;
+  1918→}
+  1919→
+  1920→.menu-widget .food-item:first-of-type {
+  1921→  border-top: 1px solid #eaebeb;
+  1922→}
+  1923→
+  1924→.menu-widget .food-item:last-of-type {
+  1925→  border-bottom: transparent;
+  1926→}
+  1927→
+  1928→.menu-widget .food-item.white {
+  1929→  background-color: #fff;
+  1930→}
+  1931→
+  1932→.menu-widget .food-item .rest-descr {
+  1933→  padding-left: 115px;
+  1934→  padding-top: 0;
+  1935→}
+  1936→
+  1937→.menu-widget .food-item .rest-descr h6 a {
+  1938→  color: #25282b;
+  1939→  font-size: 18px;
+  1940→  font-weight: 600;
+  1941→}
+  1942→
+  1943→.menu-widget .food-item .item-cart-info {
+  1944→  padding-top: 20px;
+  1945→}
+  1946→
+  1947→.menu-widget .food-item .price {
+  1948→  font-weight: 600;
+  1949→  color: #000;
+  1950→  position: relative;
+  1951→  margin-top: 6px;
+  1952→}
+  1953→
+  1954→.order-row .form-control {
+  1955→  border-radius: 0;
+  1956→}
+  1957→
+  1958→.order-row .title-row {
+  1959→  margin-bottom: 10px;
+  1960→}
+  1961→
+  1962→.order-row .title-row a i {
+  1963→  margin-top: 7px;
+  1964→}
+  1965→
+  1966→.order-row {
+  1967→  border-bottom: 1px solid #eaebeb;
+  1968→}
+  1969→
+  1970→.order-row:last-of-type {
+  1971→  border-bottom: none;
+  1972→}
+  1973→
+  1974→@media (max-width: 543px) {
+  1975→  .widget-cart {
+  1976→    margin: 20px auto;
+  1977→    float: right;
+  1978→    width: 100%;
+  1979→  }
+  1980→}
+  1981→
+  1982→@media (min-width: 544px) and (max-width: 767px) {
+  1983→  .widget-cart {
+  1984→    margin: 20px auto;
+  1985→    float: right;
+  1986→    width: 66.666667%;
+  1987→  }
+  1988→}
+  1989→
+  1990→@media (min-width: 768px) and (max-width: 991px) {
+  1991→  .widget-cart {
+  1992→    margin-top: 20px;
+  1993→    float: right;
+  1994→    width: 66.666667%;
+  1995→  }
+  1996→}
+  1997→
+  1998→@media (min-width: 992px) and (max-width: 1199px) {
+  1999→}
+  2000→
+
+[showing lines 1-2000 of 2708; use offset=2001 with limit to continue reading]

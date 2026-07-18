@@ -1,0 +1,1027 @@
+     1→# Implementation Guide — Master Agentic Prompt
+     2→
+     3→## 1. Implementation Order & Dependencies
+     4→
+     5→This document provides the complete, ordered implementation plan with agentic prompts for each phase. Each phase builds on the previous one. Phases marked with (Parallel) can be executed simultaneously.
+     6→
+     7→```
+     8→Phase 1: Foundation Setup ───────────────────────── [Sequential]
+     9→Phase 2: Database & Auth ────────────────────────── [Sequential]
+    10→Phase 3: Layout & Navigation ────────────────────── [Sequential]
+    11→Phase 4-a: Home Section (Parallel) ─────────────────┐
+    12→Phase 4-b: Restaurant Section (Parallel) ────────────┤ [Parallel]
+    13→Phase 4-c: Menu Section (Parallel) ──────────────────┘
+    14→Phase 5: Cart System ────────────────────────────── [Sequential - depends on Menu]
+    15→Phase 6: Checkout & Payment ─────────────────────── [Sequential - depends on Cart]
+    16→Phase 7: Orders Section ─────────────────────────── [Sequential - depends on Checkout]
+    17→Phase 8-a: Admin Dashboard (Parallel) ──────────────┐
+    18→Phase 8-b: Admin Categories (Parallel) ─────────────┤
+    19→Phase 8-c: Admin Restaurants (Parallel) ────────────┤ [Parallel]
+    20→Phase 8-d: Admin Foods (Parallel) ──────────────────┤
+    21→Phase 8-e: Admin Orders (Parallel) ─────────────────┘
+    22→Phase 9: Admin Customers & Earnings ─────────────── [Sequential]
+    23→Phase 10: Profile Section ───────────────────────── [Sequential]
+    24→Phase 11: Polish & Testing ──────────────────────── [Sequential]
+    25→```
+    26→
+    27→---
+    28→
+    29→## 2. Phase 1: Foundation Setup
+    30→
+    31→### Agent Prompt
+    32→```
+    33→You are setting up the FOUNDATION for NaijaBites, a Nigerian food ordering web application.
+    34→
+    35→The project is already initialized as a Next.js 16 project at /home/z/my-project. You need to configure and install dependencies.
+    36→
+    37→## Tasks
+    38→1. Install these packages:
+    39→   - @heroui/react (HeroUI v2 — follow their official Next.js setup guide)
+    40→   - framer-motion
+    41→   - zustand
+    42→   - @tanstack/react-query
+    43→   - react-hot-toast
+    44→   - bcryptjs + @types/bcryptjs
+    45→   - next-auth@4
+    46→   - zod
+    47→   - paystack (or use fetch directly for Paystack API)
+    48→   - lucide-react (if not already installed)
+    49→
+    50→2. Configure tailwind.config.ts with NaijaBites theme:
+    51→   - Primary color: Orange (f97316 family)
+    52→   - Custom fonts: Poppins, Josefin Sans, Dancing Script (Google Fonts)
+    53→   - Custom colors: brand (#f97316), naira (#dc2626), cart-bg (#1f2937), cart-item (#374151)
+    54→   - Custom animations: float, slide-in-right, fade-in
+    55→   - Custom container padding (responsive)
+    56→   - HeroUI v2 plugin integration
+    57→   - Dark mode class strategy
+    58→
+    59→3. Update src/app/globals.css:
+    60→   - Tailwind directives
+    61→   - Import Google Fonts (Poppins, Josefin Sans, Dancing Script)
+    62→   - Custom scrollbar styles (dark for cart, light for general, hidden for horizontal)
+    63→   - Custom input focus styles
+    64→   - Naira symbol styling
+    65→   - Global styles for h1-h4 (Josefin Sans, uppercase for h1)
+    66→
+    67→4. Create the folder structure:
+    68→   - src/stores/ (cart-store.ts, navigation-store.ts, ui-store.ts)
+    69→   - src/hooks/ (useAuth.ts, useCart.ts, useNavigation.ts, useProfile.ts)
+    70→   - src/types/ (index.ts, api.ts)
+    71→   - src/lib/ (db.ts, auth.ts, paystack.ts, utils.ts, validators.ts)
+    72→   - src/constants/ (index.ts)
+    73→   - src/components/layout/
+    74→   - src/components/home/
+    75→   - src/components/restaurants/
+    76→   - src/components/foods/
+    77→   - src/components/cart/
+    78→   - src/components/checkout/
+    79→   - src/components/orders/
+    80→   - src/components/profile/
+    81→   - src/components/auth/
+    82→   - src/components/admin/
+    83→   - public/uploads/
+    84→   - public/images/
+    85→
+    86→5. Create src/types/index.ts with ALL type definitions:
+    87→   - CartItem, Food, Restaurant, Category, Order, OrderItem, OrderStatusHistory
+    88→   - UserRole, UserStatus, OrderStatus, PaymentMethod, PaymentStatus
+    89→   - NavigationSection, DashboardStats, EarningsData
+    90→   - formatNaira() utility function type
+    91→
+    92→6. Create src/lib/utils.ts with utility functions:
+    93→   - formatNaira(amount: number): string — "₦X,XXX" format
+    94→   - generateOrderNumber(): Promise<string> — "ORD-YYYYMMDD-XXX"
+    95→   - truncate(str: string, length: number): string
+    96→   - getStatusColor(status: OrderStatus): string — returns Tailwind classes
+    97→   - getNigerianStates(): string[]
+    98→   - getNigerianCities(): string[]
+    99→
+   100→7. Create src/constants/index.ts with:
+   101→   - Nigerian states array (37 states + FCT)
+   102→   - Nigerian cities array (30+ cities)
+   103→   - Default categories
+   104→   - App name: "NaijaBites"
+   105→   - Delivery fee: 500, free threshold: 5000
+   106→
+   107→8. Create empty Zustand stores (will fill in later phases):
+   108→   - stores/navigation-store.ts (activeSection, filters)
+   109→   - stores/cart-store.ts (items, isOpen, methods)
+   110→   - stores/ui-store.ts (modals, panels)
+   111→
+   112→9. Verify setup by running `bun run lint` and checking for no errors.
+   113→
+   114→IMPORTANT: Do NOT modify src/app/page.tsx yet. Only set up the foundation.
+   115→Do NOT set up Prisma or database yet — that's Phase 2.
+   116→```
+   117→
+   118→---
+   119→
+   120→## 3. Phase 2: Database & Auth
+   121→
+   122→### Agent Prompt
+   123→```
+   124→You are setting up the DATABASE and AUTHENTICATION for NaijaBites.
+   125→
+   126→## Prisma Schema
+   127→1. Write the complete prisma/schema.prisma with PostgreSQL provider:
+   128→   - Enums: Role (CUSTOMER, ADMIN), UserStatus (ACTIVE, BLOCKED), OrderStatus (PENDING, CONFIRMED, PREPARING, ON_THE_WAY, DELIVERED, CANCELLED), PaymentMethod (PAYSTACK, COD), PaymentStatus (PENDING, PAID, FAILED, REFUNDED)
+   129→   - Models: User, Category, Restaurant, Food, Order, OrderItem, OrderStatusHistory
+   130→   - All fields, relations, indexes as defined in planning/05-database-schema.md
+   131→   - Cascade deletes: Category→Restaurant→Food, Order→OrderItem, Order→OrderStatusHistory
+   132→   - Use @@map for snake_case table names
+   133→
+   134→2. Create src/lib/db.ts with Prisma client singleton:
+   135→   ```typescript
+   136→   import { PrismaClient } from '@prisma/client';
+   137→   const globalForPrisma = globalThis as unknown as { prisma: PrismaClient };
+   138→   export const db = globalForPrisma.prisma || new PrismaClient();
+   139→   if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db;
+   140→   ```
+   141→
+   142→3. Set DATABASE_URL in .env:
+   143→   - Use the existing PostgreSQL connection or create one
+   144→
+   145→4. Run `bun run db:push` to create tables
+   146→
+   147→5. Create prisma/seed.ts with comprehensive seed data:
+   148→   - Admin user: admin@naijabites.ng / admin123 (bcrypt hashed)
+   149→   - 6 categories: Nigerian, Continental, Chinese, Fast Food, Drinks & Beverages, Desserts & Snacks
+   150→   - 5 restaurants: Mama Put Kitchen (Lagos), The Suya Spot (Lagos), Golden Dragon (Abuja), Burger Palace (Lagos), Continental Bistro (Port Harcourt)
+   151→   - 17+ foods with realistic Nigerian names and NGN prices (see planning/04-api-and-backend.md section 12)
+   152→   - 1 sample customer: customer@test.com / password123
+   153→   - Use upsert for idempotent seeding
+   154→   - Add seed script to package.json: "db:seed": "bun prisma/seed.ts"
+   155→
+   156→6. Run the seed script to populate data
+   157→
+   158→## NextAuth Configuration
+   159→1. Create src/lib/auth.ts with complete NextAuth options:
+   160→   - CredentialsProvider only
+   161→   - JWT strategy, 30-day max age
+   162→   - authorize(): Find user by email, check status !== BLOCKED, bcrypt compare
+   163→   - JWT callback: Add id and role to token
+   164→   - Session callback: Add id and role to session
+   165→   - Custom error messages
+   166→   - pages: signIn → "/"
+   167→   - secret: NEXTAUTH_SECRET
+   168→
+   169→2. Create src/app/api/auth/[...nextauth]/route.ts:
+   170→   ```typescript
+   171→   import NextAuth from "next-auth";
+   172→   import { authOptions } from "@/lib/auth";
+   173→   const handler = NextAuth(authOptions);
+   174→   export { handler as GET, handler as POST };
+   175→   ```
+   176→
+   177→3. Create src/app/api/auth/register/route.ts:
+   178→   - POST handler with Zod validation
+   179→   - Check email uniqueness
+   180→   - bcrypt hash password (12 salt rounds)
+   181→   - Create user in database
+   182→   - Return user data (NO password)
+   183→
+   184→4. Create src/lib/auth-helpers.ts:
+   185→   - requireAuth(): Check session, return 401 if not authenticated
+   186→   - requireAdmin(): Check session + role, return 403 if not admin
+   187→
+   188→5. Create src/lib/validators.ts with Zod schemas:
+   189→   - registerSchema
+   190→   - loginSchema
+   191→   - categorySchema
+   192→   - restaurantSchema
+   193→   - foodSchema
+   194→   - orderSchema
+   195→   - profileSchema
+   196→   - deliverySchema
+   197→
+   198→6. Add NEXTAUTH_SECRET and NEXTAUTH_URL to .env
+   199→
+   200→7. Create src/hooks/useAuth.ts:
+   201→   - Wrap useSession() from next-auth/react
+   202→   - Expose: user, isAuthenticated, isLoading, isAdmin
+   203→
+   204→8. Verify auth works by testing the register and login API endpoints.
+   205→
+   206→IMPORTANT: Ensure all Prisma operations use the db singleton from lib/db.ts.
+   207→```
+   208→
+   209→---
+   210→
+   211→## 4. Phase 3: Layout & Navigation
+   212→
+   213→### Agent Prompt
+   214→```
+   215→You are building the LAYOUT and NAVIGATION for NaijaBites.
+   216→
+   217→The app uses a SINGLE ROUTE (/) with client-side section-based navigation.
+   218→
+   219→## Root Layout (src/app/layout.tsx)
+   220→1. Import and wrap with providers:
+   221→   - HeroUIProvider
+   222→   - SessionProvider (next-auth/react)
+   223→   - QueryClientProvider (TanStack Query)
+   224→   - Toaster (react-hot-toast, position: top-right)
+   225→2. Set html lang="en"
+   226→3. Set body: font-poppins, bg-gray-50, min-h-screen, flex flex-col
+   227→4. Include Header and Footer components
+   228→5. Main content area: flex-1, mt-16 (header offset)
+   229→6. Render children (page.tsx)
+   230→
+   231→## Header Component (src/components/layout/Header.tsx)
+   232→1. Fixed top, z-50, bg-white/80 backdrop-blur-md, border-b
+   233→2. Responsive layout:
+   234→   - Desktop: Logo | Nav Links | Cart Badge | User Dropdown
+   235→   - Mobile: Hamburger | Centered Logo | Cart Badge | User Icon
+   236→3. Logo: "NaijaBites" text (font-josefin, bold, text-orange-500) + fire/fireUtensils icon
+   237→4. Nav links: Home, Restaurants, Menu, My Orders (auth only)
+   238→   - Active state: text-orange-600, border-b-2 border-orange-600
+   239→   - Inactive: text-gray-600, hover:text-orange-600
+   240→   - Controlled by navigation-store activeSection
+   241→5. Cart button: ShoppingCart icon + Badge (count from cart-store)
+   242→   - Click → toggleCart()
+   243→   - Badge: w-5 h-5 rounded-full bg-red-600, absolute -top-2 -right-2
+   244→   - Bounce animation when count changes
+   245→6. User dropdown (HeroUI Dropdown):
+   246→   - Authenticated: Avatar + name, Profile, My Orders, Admin Panel (if admin), Divider, Logout
+   247→   - Not authenticated: "Login" / "Register" buttons
+   248→7. Mobile hamburger menu (full-screen overlay with nav links)
+   249→8. Use useAuth() hook for auth state
+   250→9. Use navigation-store for active section management
+   251→
+   252→## Footer Component (src/components/layout/Footer.tsx)
+   253→1. Sticky footer: mt-auto, bg-gray-900, text-gray-400
+   254→2. 4-column grid (desktop), stacked (mobile):
+   255→   - Brand: Logo, tagline, social icons
+   256→   - Quick Links: Home, Restaurants, Menu, About
+   257→   - Contact: Phone, Email, Address (Lagos, Nigeria)
+   258→   - Hours: Mon-Sat 8AM-10PM, Sunday 10AM-8PM
+   259→3. Bottom bar: © 2024 NaijaBites. All rights reserved. | Paystack logo
+   260→4. Naira symbol usage where appropriate
+   261→
+   262→## Navigation Store (src/stores/navigation-store.ts)
+   263→1. State: activeSection, adminSection, filters (restaurantId, categoryId, search)
+   264→2. Actions: setActiveSection, setAdminSection, setFilter, clearFilters
+   265→3. Type: Section = 'home' | 'restaurants' | 'menu' | 'orders' | 'profile' | 'admin'
+   266→4. Type: AdminSection = 'dashboard' | 'restaurants' | 'categories' | 'foods' | 'orders' | 'customers' | 'earnings'
+   267→
+   268→## Main Page (src/app/page.tsx)
+   269→1. "use client" directive
+   270→2. Read activeSection from navigation-store
+   271→3. Conditionally render sections with AnimatePresence:
+   272→   - home → HomeSection
+   273→   - restaurants → RestaurantsSection
+   274→   - menu → MenuSection
+   275→   - orders → OrdersSection (auth required)
+   276→   - profile → ProfileSection (auth required)
+   277→   - admin → AdminLayout (admin required)
+   278→4. Cart panel overlay (always mounted, controlled by cart-store isOpen)
+   279→5. Auth modals (login/register, controlled by ui-store)
+   280→6. Each section gets Framer Motion section transitions (fade + slide)
+   281→
+   282→## Section Header Component (src/components/layout/SectionHeader.tsx)
+   283→1. Reusable component for all section titles
+   284→2. Props: title, subtitle?, align? ("left" | "center")
+   285→3. Title: font-josefin, text-3xl, font-bold, uppercase
+   286→4. Decorative divider below (orange gradient line)
+   287→5. Subtitle: text-gray-500, max-w-xl
+   288→
+   289→## Providers Setup
+   290→1. Create src/components/Providers.tsx combining:
+   291→   - HeroUIProvider
+   292→   - SessionProvider
+   293→   - QueryClientProvider (with default options: 5min stale time, 1 retry)
+   294→   - Toaster configuration (position: top-right, style: orange theme)
+   295→2. Use in root layout
+   296→
+   297→IMPORTANT: Keep page.tsx as "use client" since all rendering is client-side with section navigation.
+   298→The Footer MUST be sticky (mt-auto in flex column layout).
+   299→```
+   300→
+   301→---
+   302→
+   303→## 5. Phase 4-a: Home Section
+   304→
+   305→### Agent Prompt
+   306→```
+   307→You are building the HOME SECTION for NaijaBites.
+   308→
+   309→## Components to Create
+   310→1. src/components/home/HeroSection.tsx
+   311→2. src/components/home/PopularFoods.tsx
+   312→3. src/components/home/FeaturedRestaurants.tsx
+   313→4. src/components/home/HowItWorks.tsx
+   314→5. src/components/home/CTASection.tsx
+   315→6. src/components/foods/FoodCard.tsx (shared component)
+   316→
+   317→## HeroSection
+   318→1. Full-width hero with Nigerian food background image
+   319→2. Left column (md:w-1/2):
+   320→   - Badge: "🛵 Free Delivery on Orders Over ₦5,000"
+   321→   - Heading: "Order Delicious Nigerian Meals" (font-josefin, text-4xl md:text-5xl, uppercase, bold)
+   322→   - Subheading: "From the best restaurants in Lagos, Abuja & beyond" (dancing script, text-orange-600)
+   323→   - Search bar: Input with Search icon, placeholder "Search for food or restaurants..."
+   324→   - Two CTA buttons: "Order Now" (orange gradient) + "Browse Restaurants" (outline)
+   325→3. Right column (md:w-1/2):
+   326→   - Featured food image or floating food cards with Framer Motion animation
+   327→   - Cards show popular items with price
+   328→4. Background: gradient overlay on food image
+   329→5. Responsive: Stack on mobile, side-by-side on desktop
+   330→
+   331→## PopularFoods
+   332→1. Section header: "Popular Dishes" + "View All →" link
+   333→2. Grid: grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4
+   334→3. Fetch: GET /api/foods?sort=newest&limit=8
+   335→4. Use TanStack Query (useQuery) with 5-minute stale time
+   336→5. Show skeleton cards while loading (6 cards)
+   337→6. Show empty state if no foods
+   338→7. Each card is FoodCard component
+   339→
+   340→## FoodCard (Shared — used by Home, Menu, Popular)
+   341→1. Props: food (Food type), onAddToCart?, onClick?
+   342→2. Design:
+   343→   - Container: bg-white, rounded-xl, shadow-sm, hover:shadow-md, overflow-hidden, border border-gray-100
+   344→   - Image: h-48, w-full, object-cover (or default placeholder)
+   345→   - Availability badge (if unavailable: gray overlay + "Unavailable")
+   346→   - Content: p-4
+   347→     - Name: font-semibold, text-lg, line-clamp-1
+   348→     - Restaurant: text-sm, text-gray-500
+   349→     - Description: text-sm, text-gray-400, line-clamp-2
+   350→     - Price row: flex justify-between items-center
+   351→       - Price: font-bold, text-lg, ₦ in red-600
+   352→       - Add button: w-10 h-10 rounded-full bg-orange-500, Plus icon white
+   353→3. Framer Motion: whileHover scale 1.02, whileTap wiggle
+   354→4. Click → FoodDetailModal (if onClick provided)
+   355→5. Add button → Add to cart directly (cart-store.addItem)
+   356→
+   357→## FeaturedRestaurants
+   358→1. Section header: "Featured Restaurants" + "View All →"
+   359→2. Category filter pills (horizontal scroll):
+   360→   - "All" (default active), then category names from API
+   361→   - Active: bg-orange-500 text-white
+   362→   - Inactive: bg-orange-50 text-gray-700 border border-orange-200
+   363→3. Grid: grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6
+   364→4. RestaurantCard component:
+   365→   - Container: bg-white, rounded-xl, shadow-sm, hover:shadow-md, overflow-hidden
+   366→   - Image: h-52, w-full, object-cover
+   367→   - Content: p-4
+   368→     - Name: font-semibold, text-lg
+   369→     - Category badge: bg-orange-100 text-orange-700, text-xs, rounded-full
+   370→     - Address: text-sm, text-gray-500
+   371→     - Open status: green "Open Now" / red "Closed" (based on current time vs open/close hours)
+   372→   - "View Menu" button: full-width, bg-orange-500, text-white
+   373→5. Fetch: GET /api/restaurants?limit=6
+   374→6. "View Menu" → navigation-store.setActiveSection('menu') + setFilter('restaurantId', id)
+   375→
+   376→## HowItWorks
+   377→1. 3-step horizontal layout with connecting lines
+   378→2. Steps:
+   379→   - 🍽️ "Choose Restaurant" — "Browse our curated list of the best restaurants"
+   380→   - 🛒 "Select Your Meals" — "Pick from their delicious menu options"
+   381→   - 🚚 "Fast Delivery" — "Pay securely & get food delivered to your door"
+   382→3. Each step: Icon (w-16 h-16, orange-500 bg, rounded-full), Title, Description, Step number
+   383→4. Framer Motion: Staggered appear animation
+   384→
+   385→## CTASection
+   386→1. Full-width, bg-gradient-to-r from-orange-500 to-orange-700
+   387→2. "Hungry? Order Now!" heading (white, font-josefin)
+   388→3. "Browse Menu" button (white bg, text-orange-600)
+   389→4. Click → navigation-store.setActiveSection('menu')
+   390→
+   391→## API Routes Needed (create stubs if not exists)
+   392→1. GET /api/foods?sort=newest&limit=8 — Return foods with category and restaurant
+   393→2. GET /api/restaurants?limit=6 — Return restaurants with category
+   394→3. GET /api/categories — Return all categories
+   395→
+   396→IMPORTANT: Use TanStack Query for data fetching with proper loading/error states.
+   397→Show loading skeletons while data loads.
+   398→```
+   399→
+   400→---
+   401→
+   402→## 6. Phase 4-b: Restaurant Section
+   403→
+   404→### Agent Prompt
+   405→```
+   406→You are building the RESTAURANTS SECTION for NaijaBites.
+   407→
+   408→## Components to Create
+   409→1. src/components/restaurants/RestaurantsSection.tsx
+   410→2. src/components/restaurants/RestaurantCard.tsx (if not created in Phase 4-a)
+   411→3. src/components/restaurants/RestaurantFilter.tsx
+   412→
+   413→## RestaurantsSection
+   414→1. Section header: "Restaurants" + count
+   415→2. FilterBar:
+   416→   - Category filter pills (horizontal scroll, "All" + categories from API)
+   417→   - Search input (debounced, 300ms)
+   418→   - Sort dropdown: Name A-Z, Name Z-A, Newest, Most Popular
+   419→3. Grid: grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6
+   420→4. Pagination or infinite scroll
+   421→5. Fetch: GET /api/restaurants?categoryId=X&search=Y&sort=Z&page=N
+   422→6. TanStack Query with URL-based state
+   423→7. Loading: 6 skeleton restaurant cards
+   424→8. Empty: Illustration + "No restaurants found" + "Try different filters"
+   425→
+   426→## RestaurantCard (reuse from Home if exists, enhance)
+   427→1. Same design as Home FeaturedRestaurants card
+   428→2. Additional: Rating placeholder, delivery time estimate
+   429→3. "View Menu" button → navigation-store.setActiveSection('menu') + setFilter('restaurantId', id)
+   430→4. Restaurant filtering on Menu section should pre-select this restaurant
+   431→
+   432→## RestaurantFilter
+   433→1. Category pills: Same style as Home (horizontal scroll)
+   434→2. Active: bg-orange-500 text-white rounded-full px-4 py-2
+   435→3. Inactive: bg-orange-50 text-gray-700 border border-orange-200 rounded-full px-4 py-2
+   436→4. Search: HeroUI Input with Search icon
+   437→5. Sort: HeroUI Select with options
+   438→
+   439→## API Route (create if not exists)
+   440→1. GET /api/restaurants — Support query params: categoryId, search, sort, page, pageSize
+   441→2. Include category relation in response
+   442→3. Include _count for foods
+   443→4. Server-side filtering and pagination
+   444→
+   445→IMPORTANT: Category filter should fetch categories from GET /api/categories.
+   446→Debounce search input to avoid excessive API calls.
+   447→```
+   448→
+   449→---
+   450→
+   451→## 7. Phase 4-c: Menu Section
+   452→
+   453→### Agent Prompt
+   454→```
+   455→You are building the MENU SECTION for NaijaBites.
+   456→
+   457→## Components to Create
+   458→1. src/components/foods/MenuSection.tsx
+   459→2. src/components/foods/FoodGrid.tsx
+   460→3. src/components/foods/FoodFilter.tsx
+   461→4. src/components/foods/FoodDetailModal.tsx
+   462→
+   463→## MenuSection
+   464→1. Section header: "Menu" + food count
+   465→2. FilterBar:
+   466→   - Restaurant select (HeroUI Select, filtered by category if set)
+   467→   - Category pills (horizontal scroll, "All" + categories)
+   468→   - Search input (debounced)
+   469→   - Availability toggle (Switch: "Show available only")
+   470→3. Food grid: grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4
+   471→4. Fetch: GET /api/foods?categoryId=X&restaurantId=Y&search=Z&isAvailable=true
+   472→5. TanStack Query with 5-minute stale time
+   473→6. Loading: 8 skeleton food cards
+   474→7. Empty: "No food items found" + "Try different filters"
+   475→
+   476→## FoodFilter
+   477→1. Restaurant dropdown: HeroUI Select, options from GET /api/restaurants
+   478→2. Category pills: Same pattern as Restaurant filter
+   479→3. Search: HeroUI Input with Search icon, debounce 300ms
+   480→4. Availability: HeroUI Switch "Available only"
+   481→5. Pre-filter: If navigation-store has restaurantId filter, pre-select it
+   482→
+   483→## FoodDetailModal
+   484→1. HeroUI Modal (centered, max-w-lg, scrollBehavior="inside")
+   485→2. Image: Full-width, h-64, object-cover (top of modal)
+   486→3. Close button: Absolute top-right, white circle with X
+   487→4. Content:
+   488→   - Food name (font-semibold, text-2xl)
+   489→   - Restaurant name (text-orange-600, clickable → go to restaurant menu)
+   490→   - Description (text-gray-500)
+   491→   - Quantity selector: flex items-center gap-3
+   492→     - Minus button (w-8 h-8 rounded-full bg-gray-200, disabled when qty=1)
+   493→     - Quantity display (w-12 text-center, font-bold)
+   494→     - Plus button (w-8 h-8 rounded-full bg-gray-200)
+   495→   - Price display: "Total: ₦X,XXX" (updates with quantity)
+   496→5. Footer: "Add to Cart — ₦X,XXX" button (full-width, orange gradient)
+   497→6. On add: cart-store.addItem(), toast, close modal after 500ms
+   498→7. Framer Motion: Modal fade + scale animation
+   499→
+   500→## API Route (create if not exists)
+   501→1. GET /api/foods — Support: categoryId, restaurantId, search, isAvailable, sort, page, pageSize
+   502→2. Include category and restaurant relations
+   503→3. Server-side filtering with Prisma where clauses
+   504→
+   505→IMPORTANT: The menu section is the CORE of the app — make it feel polished.
+   506→Food cards must have smooth add-to-cart interactions.
+   507→The FoodDetailModal should show quantity updates and price calculation in real-time.
+   508→```
+   509→
+   510→---
+   511→
+   512→## 8. Phase 5: Cart System
+   513→
+   514→### Agent Prompt
+   515→```
+   516→You are building the CART SYSTEM for NaijaBites.
+   517→
+   518→## Cart Store (src/stores/cart-store.ts)
+   519→1. Full Zustand store with persist middleware (localStorage key: 'naijabites-cart')
+   520→2. Interface: items[], isOpen, openCart(), closeCart(), toggleCart(), addItem(), removeItem(), updateQuantity(), incrementQuantity(), decrementQuantity(), clearCart(), getSubtotal(), getDeliveryFee(), getTotal(), getItemCount(), getUniqueItemCount()
+   521→3. Delivery fee logic: subtotal >= 5000 ? 0 : 500
+   522→4. Max quantity: 99 per item
+   523→5. Min quantity: 1 (remove if 0)
+   524→6. addItem checks for existing item → increment quantity
+   525→7. All mutations trigger toast notifications
+   526→8. Persist only items array (not isOpen)
+   527→
+   528→## Cart Panel (src/components/cart/CartPanel.tsx)
+   529→1. Fixed position, right-0, z-100
+   530→2. Framer Motion slide-in from right (x: "100%" → 0)
+   531→3. Backdrop: bg-black/50, click → closeCart()
+   532→4. Width: w-full (mobile), w-[400px] (md+)
+   533→5. Header (bg-white):
+   534→   - Back arrow button
+   535→   - "Your Cart" + ShoppingCart icon
+   536→   - Clear all button (text-red-600, only if items exist)
+   537→6. Body (bg-gray-900, rounded-t-3xl, scrollable, max-h-[400px]):
+   538→   - Cart items list (CartItem components)
+   539→   - Empty state: emptyCart SVG + "Your cart is empty" + "Browse Menu" link
+   540→   - Free delivery indicator: If subtotal close to ₦5,000, show "Add ₦X more for FREE delivery!"
+   541→7. Footer (bg-gray-800, rounded-t-3xl):
+   542→   - Subtotal row: text-gray-400 / text-gray-50
+   543→   - Delivery fee: "₦500" or "FREE" (green)
+   544→   - Total: font-bold, text-lg, text-white
+   545→   - Checkout button: full-width, orange gradient, "Proceed to Checkout"
+   546→   - Disabled if cart empty
+   547→
+   548→## Cart Item (src/components/cart/CartItem.tsx)
+   549→1. Container: bg-gray-700, rounded-lg, p-2, mb-3
+   550→2. Layout: flex items-center gap-3
+   551→3. Food image: w-16 h-16 rounded-full object-cover (or placeholder)
+   552→4. Info section (flex-1):
+   553→   - Name: text-white, font-semibold, line-clamp-1
+   554→   - Restaurant: text-gray-400, text-xs
+   555→   - Price: text-gray-300, font-semibold, ₦ in red
+   556→5. Quantity controls (flex items-center gap-2):
+   557→   - Minus: w-6 h-6 bg-gray-600 rounded, text-white, disabled at qty=1
+   558→   - Display: w-8 text-center, text-white, font-bold
+   559→   - Plus: w-6 h-6 bg-gray-600 rounded, text-white, disabled at qty=99
+   560→6. Delete button: w-8 h-8 bg-red-600 rounded-full, Trash icon white
+   561→7. All actions call cart-store methods
+   562→
+   563→## Integration
+   564→1. Cart button in Header shows itemCount badge
+   565→2. Cart badge bounces (Framer Motion) on addItem
+   566→3. FoodCard "Add to Cart" calls addItem
+   567→4. FoodDetailModal "Add to Cart" calls addItem with quantity
+   568→5. "Proceed to Checkout" → Open checkout panel (Phase 6)
+   569→
+   570→IMPORTANT: The cart panel MUST use dark theme (Bentilzone-inspired).
+   571→Cart items MUST have real-time price updates when quantity changes.
+   572→Cart persists to localStorage so it survives page refreshes.
+   573→```
+   574→
+   575→---
+   576→
+   577→## 9. Phase 6: Checkout & Payment
+   578→
+   579→### Agent Prompt
+   580→```
+   581→You are building the CHECKOUT & PAYMENT system for NaijaBites.
+   582→
+   583→## Checkout Panel (src/components/checkout/CheckoutPanel.tsx)
+   584→1. Same slide-in pattern as Cart (fixed right, Framer Motion)
+   585→2. Replaces cart panel when checkout is active
+   586→3. Steps: Delivery Info → Payment Method → Order Summary
+   587→
+   588→## Delivery Form (src/components/checkout/DeliveryForm.tsx)
+   589→1. Pre-filled from user profile (GET /api/profile)
+   590→2. Fields (all HeroUI Input/Select/Textarea):
+   591→   - Full Name (required)
+   592→   - Phone (required, +234 prefix, 11+ digits)
+   593→   - Delivery Address (required, textarea)
+   594→   - City (required, Select with Nigerian cities)
+   595→   - State (required, Select with Nigerian states)
+   596→   - Delivery Instructions (optional, textarea)
+   597→3. Zod validation (client-side + server-side)
+   598→4. Invalid fields: red border, error message below
+   599→
+   600→## Payment Selector (src/components/checkout/PaymentSelector.tsx)
+   601→1. HeroUI RadioGroup with two options:
+   602→   - Paystack: Icon + "Pay with Card, Bank Transfer or USSD"
+   603→   - COD: Icon + "Cash on Delivery — Pay when you receive"
+   604→2. Selected method determines checkout button text:
+   605→   - Paystack: "Pay ₦X,XXX"
+   606→   - COD: "Place Order"
+   607→
+   608→## Order Summary (src/components/checkout/OrderSummary.tsx)
+   609→1. Compact items list: name × qty = price
+   610→2. Subtotal, delivery fee, total
+   611→3. Delivery address summary
+   612→4. Payment method indicator
+   613→
+   614→## Checkout Flow
+   615→1. User clicks "Proceed to Checkout" in cart
+   616→2. Checkout panel slides in
+   617→3. Fill delivery form (pre-filled if profile exists)
+   618→4. Select payment method
+   619→5. Review order summary
+   620→6. Click "Pay ₦X,XXX" or "Place Order"
+   621→
+   622→### Paystack Flow
+   623→1. Click "Pay ₦X,XXX" → loading state on button
+   624→2. POST /api/orders → Create order with server-side price verification
+   625→3. POST /api/paystack/initialize → Get Paystack authorization URL
+   626→4. Redirect window.location.href = authorizationUrl
+   627→5. User pays on Paystack page
+   628→6. Paystack redirects to /api/paystack/verify?reference=xxx
+   629→7. Server verifies payment → updates order → redirects to app
+   630→8. Success: Cart cleared, toast "Order placed successfully! 🎉", navigate to orders
+   631→9. Failure: Toast "Payment failed", order exists as PENDING
+   632→
+   633→### COD Flow
+   634→1. Click "Place Order" → Confirmation dialog
+   635→2. POST /api/orders → Create order with paymentMethod: COD
+   636→3. Cart cleared, toast "Order placed! Pay on delivery."
+   637→4. Navigate to orders section
+   638→
+   639→## API Routes
+   640→1. POST /api/orders — Full order creation with price verification
+   641→   - Validate items exist and are available
+   642→   - Use SERVER-SIDE prices (ignore client prices)
+   643→   - Calculate subtotal, delivery fee, total
+   644→   - Generate order number
+   645→   - Create order + items + status history
+   646→   - Return orderId + paystackUrl (if Paystack)
+   647→
+   648→2. POST /api/paystack/initialize — Initialize Paystack transaction
+   649→   - Call Paystack API
+   650→   - Return authorization URL
+   651→
+   652→3. GET /api/paystack/verify — Verify Paystack payment
+   653→   - Verify with Paystack API
+   654→   - Update order paymentStatus and status
+   655→   - Redirect to frontend with success/failure
+   656→
+   657→4. POST /api/paystack/webhook — Paystack webhook handler
+   658→   - Verify HMAC-SHA512 signature
+   659→   - Handle charge.success, charge.failed, refund.processed
+   660→
+   661→5. GET /api/profile — Get current user profile (for pre-filling delivery form)
+   662→
+   663→## Paystack Library (src/lib/paystack.ts)
+   664→1. initializeTransaction(): Call Paystack API, return auth URL
+   665→2. verifyTransaction(): Verify payment, return status
+   666→3. initiateRefund(): Cancel/refund a transaction
+   667→
+   668→## Price Change Handling
+   669→1. Client sends expectedPrice with each item
+   670→2. Server compares with actual food.price
+   671→3. If mismatch → 409 response with price changes
+   672→4. Client shows modal: "Prices have changed" with options to update or cancel
+   673→5. If user accepts → Update cart prices, re-submit
+   674→
+   675→IMPORTANT: Server-side price verification is CRITICAL. Never trust client-sent prices.
+   676→Paystack integration uses NGN (multiply amount by 100 for kobo).
+   677→Handle ALL error cases (network failure, payment failure, price changes, unavailable items).
+   678→```
+   679→
+   680→---
+   681→
+   682→## 10. Phase 7: Orders Section
+   683→
+   684→### Agent Prompt
+   685→```
+   686→You are building the ORDERS SECTION for NaijaBites.
+   687→
+   688→## Components to Create
+   689→1. src/components/orders/OrdersSection.tsx
+   690→2. src/components/orders/OrderCard.tsx
+   691→3. src/components/orders/OrderDetail.tsx
+   692→
+   693→## OrdersSection
+   694→1. Section header: "My Orders"
+   695→2. Filter tabs: All, Pending, Confirmed, Preparing, On The Way, Delivered, Cancelled
+   696→   - HeroUI Tabs component
+   697→   - Each tab shows count badge
+   698→3. Fetch: GET /api/orders?status=X
+   699→4. TanStack Query with auto-refresh (30 seconds for active orders)
+   700→5. Vertical list of OrderCards
+   701→6. Loading: 3 skeleton order cards
+   702→7. Empty: "No orders yet" + "Start Ordering" button
+   703→
+   704→## OrderCard
+   705→1. Container: bg-white, rounded-lg, shadow-sm, border-l-4 (status color)
+   706→2. Header: Order number + Date + Status badge (color-coded pill)
+   707→3. Items: Compact list (food image w-8 h-8 + name + qty + price)
+   708→4. Footer: Total amount + Payment badge + View Detail button + Cancel button (if PENDING/CONFIRMED)
+   709→5. Status badge colors:
+   710→   - PENDING: blue-100/blue-700
+   711→   - CONFIRMED: indigo-100/indigo-700
+   712→   - PREPARING: yellow-100/yellow-700
+   713→   - ON_THE_WAY: orange-100/orange-700
+   714→   - DELIVERED: green-100/green-700
+   715→   - CANCELLED: red-100/red-700
+   716→
+   717→## OrderDetail
+   718→1. Full section view (replaces order list)
+   719→2. Back button → return to orders list
+   720→3. Order header: Order number, date, large status badge
+   721→4. Customer info card: Name, email, phone, address
+   722→5. Payment info card: Method, status, reference (if Paystack)
+   723→6. Order items table: Image, Name, Qty, Unit Price, Total
+   724→7. Order totals: Subtotal, Delivery Fee, Total (bold)
+   725→8. Status timeline: Visual progress bar showing current status
+   726→9. Status history: Timeline of all changes (date + status + remark)
+   727→10. Cancel button (if PENDING or CONFIRMED): Confirmation modal
+   728→
+   729→## Cancel Order Flow
+   730→1. Click "Cancel Order"
+   731→2. Confirmation modal: "Are you sure you want to cancel this order?"
+   732→3. If paid: "Your refund will be processed within 3-5 business days."
+   733→4. PUT /api/orders with { id, cancel: true }
+   734→5. Server: Validate can cancel (PENDING or CONFIRMED only)
+   735→6. If was paid via Paystack: Initiate refund
+   736→7. Update status to CANCELLED
+   737→8. Toast: "Order cancelled successfully"
+   738→
+   739→## API Routes (create or enhance)
+   740→1. GET /api/orders — List orders (user's own, or all for admin)
+   741→   - Query: status, search, page, pageSize, id (for single order)
+   742→   - Include items and statusHistory
+   743→2. PUT /api/orders — Update order (cancel for customer, status for admin)
+   744→3. GET /api/orders?id=X — Single order with full details
+   745→
+   746→IMPORTANT: Orders should auto-refresh for active orders (PENDING through ON_THE_WAY).
+   747→Show clear status badges and progress indicators.
+   748→```
+   749→
+   750→---
+   751→
+   752→## 11. Phase 8: Admin Panel
+   753→
+   754→### Agent Prompt (for all admin sub-phases)
+   755→```
+   756→You are building the ADMIN PANEL for NaijaBites.
+   757→
+   758→The admin panel is a section within the single-page app (activeSection === 'admin'), with its own layout (sidebar + content area).
+   759→
+   760→## Admin Layout (src/components/admin/AdminLayout.tsx)
+   761→1. Full-screen layout: flex, h-screen
+   762→2. Left sidebar (w-64, fixed, bg-orange-600):
+   763→   - Logo: "NaijaBites" + "Admin" badge (font-josefin)
+   764→   - Navigation items (vertical list):
+   765→     - Dashboard (LayoutDashboard icon)
+   766→     - Restaurants (Store icon)
+   767→     - Categories (Tag icon)
+   768→     - Food Menu (UtensilsCrossed icon)
+   769→     - Orders (ShoppingCart icon) + count badge
+   770→     - Customers (Users icon) + count badge
+   771→     - Earnings (DollarSign icon)
+   772→   - Active: bg-orange-700 rounded-md font-semibold
+   773→   - Hover: bg-orange-700/50 rounded-md
+   774→   - Logout at bottom (mt-auto)
+   775→3. Right content area (flex-1, bg-gray-50, overflow-y-auto):
+   776→   - Header: "Back to Store" button (top-right)
+   777→   - Content header: Section title + action buttons
+   778→   - Scrollable content body with padding
+   779→4. Controlled by navigation-store adminSection
+   780→5. Only accessible if useAuth().isAdmin === true
+   781→
+   782→## Admin Dashboard (src/components/admin/AdminDashboard.tsx)
+   783→1. 8 stat cards in grid (2 cols mobile, 4 cols desktop):
+   784→   - Total Restaurants (orange-500 icon)
+   785→   - Total Food Items (blue-500 icon)
+   786→   - Total Customers (green-500 icon)
+   787→   - Total Orders (purple-500 icon)
+   788→   - Pending Orders (yellow-500 icon)
+   789→   - Today's Orders (indigo-500 icon)
+   790→   - Total Earnings (emerald-500 icon)
+   791→   - Cancelled Orders (red-500 icon)
+   792→2. Each card: Icon + Title + Value + Trend
+   793→3. Recent orders table (5 rows)
+   794→4. Simple revenue chart (7-day bar chart — use CSS or lightweight library)
+   795→5. Fetch: GET /api/dashboard/stats
+   796→
+   797→## Admin Categories (src/components/admin/AdminCategories.tsx)
+   798→1. Category cards grid (3 cols) + "Add Category" button
+   799→2. CategoryCard: Image, name, food/restaurant counts, edit/delete actions
+   800→3. Add/Edit form (HeroUI Modal): Name, Description, Image upload
+   801→4. Delete: Confirmation modal with cascade warning
+   802→5. API: GET/POST/PUT/DELETE /api/categories
+   803→
+   804→## Admin Restaurants (src/components/admin/AdminRestaurants.tsx)
+   805→1. Data table (HeroUI Table) + "Add Restaurant" button
+   806→2. Search + Category filter
+   807→3. Columns: Image, Name, Category, City, Status, Actions
+   808→4. Add/Edit form (HeroUI Modal):
+   809→   - Name, Category (Select), Email, Phone, Address, City (Select), State (Select)
+   810→   - Open/Close Time, Open Days, Image upload, Active switch
+   811→5. Delete: Cascade warning
+   812→6. API: GET/POST/PUT/DELETE /api/restaurants
+   813→
+   814→## Admin Foods (src/components/admin/AdminMenuItems.tsx)
+   815→1. Data table + "Add Food" button
+   816→2. Search + Category filter + Restaurant filter + Availability filter
+   817→3. Columns: Image, Name, Category, Restaurant, Price (₦), Available, Actions
+   818→4. Quick availability toggle (Switch in table)
+   819→5. Add/Edit form (HeroUI Modal):
+   820→   - Name, Description, Category (Select), Restaurant (Select, filtered by category)
+   821→   - Price (₦ prefix), Image upload, Available switch
+   822→6. Delete: Confirmation
+   823→7. API: GET/POST/PUT/DELETE /api/foods
+   824→
+   825→## Admin Orders (src/components/admin/AdminOrders.tsx)
+   826→1. Data table with status filter tabs
+   827→2. Columns: Order #, Customer, Items, Amount, Payment, Status, Date, Actions
+   828→3. Order detail view: Full detail with update status form
+   829→4. Update status: Dropdown + Remark textarea + Update button
+   830→5. Status transitions: PENDING→CONFIRMED→PREPARING→ON_THE_WAY→DELIVERED (or CANCELLED)
+   831→6. Prevent backward transitions
+   832→7. Delete: Severe warning for paid orders
+   833→8. API: GET/PUT/DELETE /api/orders (admin sees all, can update status)
+   834→
+   835→## Image Upload (src/components/common/ImageUploader.tsx)
+   836→1. Click to upload or drag & drop
+   837→2. Preview before upload
+   838→3. POST /api/upload → Returns URL
+   839→4. Validation: jpg/png/webp, max 2MB
+   840→5. Loading state during upload
+   841→6. Delete uploaded image option
+   842→
+   843→## Upload API (src/app/api/upload/route.ts)
+   844→1. Admin-only (or authenticated for avatar)
+   845→2. Accept FormData with 'file' field
+   846→3. Validate: type (jpg/jpeg/png/webp), size (< 2MB)
+   847→4. Generate unique filename: `{timestamp}-{randomHex}.{ext}`
+   848→5. Save to public/uploads/
+   849→6. Return: { data: { url: "/uploads/filename.jpg" } }
+   850→
+   851→## All Admin API Routes (create if not exists)
+   852→1. GET/POST/PUT/DELETE /api/categories — Admin-only write operations
+   853→2. GET/POST/PUT/DELETE /api/restaurants — Admin-only write operations
+   854→3. GET/POST/PUT/DELETE /api/foods — Admin-only write operations, filtering support
+   855→4. GET/PUT/DELETE /api/orders — Admin can see all, update status, delete
+   856→5. GET/PUT/DELETE /api/users — Admin-only, list/update/delete users
+   857→6. GET /api/dashboard/stats — Dashboard statistics
+   858→7. GET /api/dashboard/earnings — Earnings data with period filter
+   859→8. POST /api/upload — Image upload
+   860→
+   861→IMPORTANT: ALL admin API routes MUST verify session.user.role === 'ADMIN'.
+   862→Use HeroUI Table component for all data tables.
+   863→All forms use Zod validation.
+   864→Toast notifications for all CRUD operations.
+   865→```
+   866→
+   867→---
+   868→
+   869→## 12. Phase 9: Admin Customers & Earnings
+   870→
+   871→### Agent Prompt
+   872→```
+   873→You are building the CUSTOMER MANAGEMENT and EARNINGS sections for NaijaBites Admin Panel.
+   874→
+   875→## Admin Customers (src/components/admin/AdminCustomers.tsx)
+   876→1. Data table with search + status filter (All, Active, Blocked)
+   877→2. Columns: Avatar, Name, Email, Phone, Orders Count, Total Spent, Status, Joined, Actions
+   878→3. Actions: Edit (modal form), Block/Unblock, Delete
+   879→4. Block: Confirmation modal "Block [Name]? They won't be able to login."
+   880→5. Unblock: "Unblock [Name]? They will be able to login again."
+   881→6. Cannot block admin users
+   882→7. Delete: Warning modal, recommend blocking instead
+   883→8. Edit form: Name, Phone, Address, City, State, Status
+   884→9. API: GET/PUT/DELETE /api/users
+   885→
+   886→## Admin Earnings (src/components/admin/AdminEarnings.tsx)
+   887→1. Period selector: Today, This Week, This Month, This Year, All Time (HeroUI Tabs)
+   888→2. Summary cards (3 cols):
+   889→   - Total Earnings (₦XXX,XXX)
+   890→   - Paystack Earnings (₦XXX,XXX)
+   891→   - COD Earnings (₦XXX,XXX)
+   892→3. Revenue chart: Simple bar chart showing daily revenue (CSS or lightweight)
+   893→4. Top restaurants table: Name, Orders, Revenue (sorted by revenue desc)
+   894→5. Recent transactions table: Date, Order #, Customer, Amount, Method, Status
+   895→6. API: GET /api/dashboard/earnings?period=month
+   896→
+   897→## Users API Enhancements
+   898→1. GET /api/users — Add: search (name/email/phone), status filter, pagination
+   899→2. Include order count and total spent for each user
+   900→3. PUT /api/users — Block/unblock, edit details
+   901→4. DELETE /api/users — Delete with order cascade warning
+   902→
+   903→IMPORTANT: Calculate total spent per customer from paid orders only.
+   904→Earnings should only count PAID orders (paymentStatus = 'PAID').
+   905→```
+   906→
+   907→---
+   908→
+   909→## 13. Phase 10: Profile Section
+   910→
+   911→### Agent Prompt
+   912→```
+   913→You are building the PROFILE SECTION for NaijaBites.
+   914→
+   915→## Profile Section (src/components/profile/ProfileSection.tsx)
+   916→1. Section header: "My Profile"
+   917→2. Two-column layout (avatar + form)
+   918→3. Avatar section:
+   919→   - Current avatar (w-24 h-24 rounded-full) or initials
+   920→   - "Change Photo" button → file upload
+   921→   - Upload to /api/upload → update avatar URL
+   922→   - Delete photo option
+   923→4. Form fields (HeroUI Input):
+   924→   - Full Name (with User icon)
+   925→   - Email (disabled, read-only, gray bg)
+   926→   - Phone (with Phone icon, +234 prefix)
+   927→   - Address (Textarea)
+   928→   - City (Select, Nigerian cities)
+   929→   - State (Select, Nigerian states)
+   930→5. Save button (orange gradient, full-width)
+   931→6. Pre-filled from GET /api/profile
+   932→7. Save: PUT /api/profile with validation
+   933→8. Toast on success/error
+   934→
+   935→## Profile API (src/app/api/profile/route.ts)
+   936→1. GET: Return current user profile (from session email)
+   937→2. PUT: Update name, phone, address, city, state, avatar
+   938→   - Cannot change email or role from profile
+   939→   - Zod validation
+   940→3. Avatar upload: If avatar field changed, it's already uploaded via /api/upload
+   941→
+   942→## Auth Modals (src/components/auth/LoginForm.tsx, RegisterForm.tsx)
+   943→1. Login: HeroUI Modal, email + password, show/hide toggle, "Login" button
+   944→2. Register: HeroUI Modal, full form with password strength indicator
+   945→3. Both: Error display, loading state, link to other form
+   946→4. Use next-auth/react signIn() for login
+   947→5. Use POST /api/auth/register + signIn() for registration
+   948→6. Modals controlled by ui-store (showLogin, showRegister)
+   949→
+   950→IMPORTANT: Email is read-only in profile — users cannot change their email.
+   951→Password change is NOT included in v1 (can be added later).
+   952→```
+   953→
+   954→---
+   955→
+   956→## 14. Phase 11: Polish & Testing
+   957→
+   958→### Agent Prompt
+   959→```
+   960→You are doing the FINAL POLISH and testing for NaijaBites.
+   961→
+   962→## Tasks
+   963→1. Check all components for:
+   964→   - Loading states (skeletons)
+   965→   - Empty states (illustrations + messages)
+   966→   - Error states (retry buttons)
+   967→   - Responsive design (test mobile, tablet, desktop layouts)
+   968→
+   969→2. Verify all interactions:
+   970→   - Registration → auto-login → welcome toast
+   971→   - Login → redirect home → user dropdown shows
+   972→   - Browse menu → add to cart → cart badge updates
+   973→   - Cart operations: add, remove, increment, decrement, clear
+   974→   - Checkout with Paystack → redirect → verify → success
+   975→   - Checkout with COD → order created → redirect to orders
+   976→   - Cancel order → confirmation → status update → refund (if paid)
+   977→   - Admin: All CRUD operations work
+   978→   - Admin: Order status updates work
+   979→   - Admin: Dashboard stats are accurate
+   980→
+   981→3. Verify Nigerian context:
+   982→   - ₦ (Naira) symbol everywhere
+   983→   - Nigerian cities and states in dropdowns
+   984→   - Nigerian food names in seed data
+   985→   - Phone format +234
+   986→
+   987→4. Verify security:
+   988→   - Admin routes protected
+   989→   - User can only see own orders
+   990→   - Price verification on checkout
+   991→   - File upload validation
+   992→   - Password hashing
+   993→
+   994→5. Run `bun run lint` and fix any issues
+   995→
+   996→6. Check dev server log for any runtime errors
+   997→
+   998→7. Verify sticky footer on short and long pages
+   999→
+  1000→8. Test with empty database (no seed data) — should show appropriate empty states
+  1001→
+  1002→9. Add any missing toast notifications
+  1003→
+  1004→10. Ensure Framer Motion animations are smooth (no jank)
+  1005→
+  1006→11. Fix any TypeScript errors
+  1007→
+  1008→IMPORTANT: Do NOT run `bun run build`. Only use `bun run lint` for code quality checks.
+  1009→Test the app in the browser using the Preview Panel.
+  1010→```
+  1011→
+  1012→---
+  1013→
+  1014→## 15. Summary: All Planning Files
+  1015→
+  1016→| File | Content |
+  1017→|------|---------|
+  1018→| `01-project-overview-and-architecture.md` | Tech stack, route architecture, database schema, design system, auth design, Paystack integration, file upload, key decisions, folder structure |
+  1019→| `02-client-side-features.md` | Home, Restaurants, Menu, Cart, Checkout, Orders, Profile sections — detailed component design, interactions, edge cases |
+  1020→| `03-admin-panel-features.md` | Admin layout, Dashboard, Restaurant/Category/Food management, Order management, Customer management, Earnings — detailed specs |
+  1021→| `04-api-and-backend.md` | All API endpoints with request/response formats, validation schemas, Paystack integration code, seed data, security checklist |
+  1022→| `05-database-schema.md` | Complete Prisma schema, ER diagram, indexes, data integrity rules, migration strategy, query patterns |
+  1023→| `06-design-system-and-ui.md` | Color palette, typography, component specs, layout patterns, HeroUI mapping, responsive rules, animations, scrollbar styling |
+  1024→| `07-cart-and-checkout-flow.md` | Cart store implementation, add/remove/update flows, checkout panel, Paystack integration, price change handling, order lifecycle |
+  1025→| `08-authentication-and-security.md` | Registration/login flows, NextAuth config, JWT structure, authorization system, security measures, environment variables |
+  1026→| `09-implementation-guide.md` | This file — master agentic prompt with ordered phases and detailed agent instructions |
+  1027→

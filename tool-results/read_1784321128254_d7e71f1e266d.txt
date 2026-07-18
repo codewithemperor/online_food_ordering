@@ -1,0 +1,995 @@
+     1→# Cart & Checkout Flow Planning
+     2→
+     3→## 1. Cart System Architecture
+     4→
+     5→### 1.1 State Management (Zustand)
+     6→
+     7→The cart is managed entirely on the client side using Zustand with localStorage persistence. This provides instant UI feedback without server round-trips for every cart action.
+     8→
+     9→```typescript
+    10→// stores/cart-store.ts
+    11→import { create } from 'zustand';
+    12→import { persist } from 'zustand/middleware';
+    13→
+    14→interface CartItem {
+    15→  foodId: string;
+    16→  foodName: string;
+    17→  foodImage: string | null;
+    18→  price: number;           // Unit price (NGN) — verified server-side at checkout
+    19→  quantity: number;
+    20→  restaurantId: string;
+    21→  restaurantName: string;
+    22→  categoryId: string;
+    23→}
+    24→
+    25→interface CartStore {
+    26→  items: CartItem[];
+    27→  isOpen: boolean;
+    28→  
+    29→  // Panel controls
+    30→  openCart: () => void;
+    31→  closeCart: () => void;
+    32→  toggleCart: () => void;
+    33→  
+    34→  // Item operations
+    35→  addItem: (item: Omit<CartItem, 'quantity'> & { quantity?: number }) => void;
+    36→  removeItem: (foodId: string) => void;
+    37→  updateQuantity: (foodId: string, quantity: number) => void;
+    38→  incrementQuantity: (foodId: string) => void;
+    39→  decrementQuantity: (foodId: string) => void;
+    40→  clearCart: () => void;
+    41→  
+    42→  // Computed values
+    43→  getSubtotal: () => number;
+    44→  getDeliveryFee: () => number;
+    45→  getTotal: () => number;
+    46→  getItemCount: () => number;
+    47→  getUniqueItemCount: () => number;
+    48→  
+    49→  // Restaurant check
+    50→  getRestaurantId: () => string | null;
+    51→}
+    52→```
+    53→
+    54→### 1.2 Cart Store Implementation
+    55→
+    56→```typescript
+    57→export const useCartStore = create<CartStore>()(
+    58→  persist(
+    59→    (set, get) => ({
+    60→      items: [],
+    61→      isOpen: false,
+    62→      
+    63→      openCart: () => set({ isOpen: true }),
+    64→      closeCart: () => set({ isOpen: false }),
+    65→      toggleCart: () => set((state) => ({ isOpen: !state.isOpen })),
+    66→      
+    67→      addItem: (newItem) => {
+    68→        const items = get().items;
+    69→        const existingItem = items.find(item => item.foodId === newItem.foodId);
+    70→        
+    71→        if (existingItem) {
+    72→          // Increment quantity if item already in cart
+    73→          set({
+    74→            items: items.map(item =>
+    75→              item.foodId === newItem.foodId
+    76→                ? { ...item, quantity: item.quantity + (newItem.quantity || 1) }
+    77→                : item
+    78→            ),
+    79→          });
+    80→        } else {
+    81→          // Add new item with quantity 1 (or specified quantity)
+    82→          set({
+    83→            items: [...items, { ...newItem, quantity: newItem.quantity || 1 }],
+    84→          });
+    85→        }
+    86→        
+    87→        // Show toast notification
+    88→        toast.success(`${newItem.foodName} added to cart`);
+    89→        
+    90→        // Bounce cart badge animation handled by component
+    91→      },
+    92→      
+    93→      removeItem: (foodId) => {
+    94→        const items = get().items;
+    95→        const item = items.find(i => i.foodId === foodId);
+    96→        set({ items: items.filter(i => i.foodId !== foodId) });
+    97→        if (item) toast.success(`${item.foodName} removed from cart`);
+    98→      },
+    99→      
+   100→      updateQuantity: (foodId, quantity) => {
+   101→        if (quantity < 1) {
+   102→          get().removeItem(foodId);
+   103→          return;
+   104→        }
+   105→        if (quantity > 99) return; // Max 99 per item
+   106→        set({
+   107→          items: get().items.map(item =>
+   108→            item.foodId === foodId ? { ...item, quantity } : item
+   109→          ),
+   110→        });
+   111→      },
+   112→      
+   113→      incrementQuantity: (foodId) => {
+   114→        const item = get().items.find(i => i.foodId === foodId);
+   115→        if (item && item.quantity < 99) {
+   116→          get().updateQuantity(foodId, item.quantity + 1);
+   117→        }
+   118→      },
+   119→      
+   120→      decrementQuantity: (foodId) => {
+   121→        const item = get().items.find(i => i.foodId === foodId);
+   122→        if (item && item.quantity > 1) {
+   123→          get().updateQuantity(foodId, item.quantity - 1);
+   124→        }
+   125→      },
+   126→      
+   127→      clearCart: () => {
+   128→        set({ items: [] });
+   129→        toast.success('Cart cleared');
+   130→      },
+   131→      
+   132→      getSubtotal: () => {
+   133→        return get().items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+   134→      },
+   135→      
+   136→      getDeliveryFee: () => {
+   137→        const subtotal = get().getSubtotal();
+   138→        return subtotal >= 5000 ? 0 : 500;
+   139→      },
+   140→      
+   141→      getTotal: () => {
+   142→        return get().getSubtotal() + get().getDeliveryFee();
+   143→      },
+   144→      
+   145→      getItemCount: () => {
+   146→        return get().items.reduce((sum, item) => sum + item.quantity, 0);
+   147→      },
+   148→      
+   149→      getUniqueItemCount: () => {
+   150→        return get().items.length;
+   151→      },
+   152→      
+   153→      getRestaurantId: () => {
+   154→        const items = get().items;
+   155→        return items.length > 0 ? items[0].restaurantId : null;
+   156→      },
+   157→    }),
+   158→    {
+   159→      name: 'naijabites-cart', // localStorage key
+   160→      partialize: (state) => ({ items: state.items }), // Only persist items
+   161→    }
+   162→  )
+   163→);
+   164→```
+   165→
+   166→### 1.3 Cart Add Flow (Detailed)
+   167→
+   168→**Scenario 1: Simple Add (No modal)**
+   169→```
+   170→User clicks "Add to Cart" on food card
+   171→  → Cart store addItem() called
+   172→  → Item added with quantity 1
+   173→  → Toast: "Jollof Rice added to cart"
+   174→  → Cart badge bounces (animation)
+   175→  → Cart panel doesn't open (non-intrusive)
+   176→```
+   177→
+   178→**Scenario 2: Add via Food Detail Modal**
+   179→```
+   180→User clicks food card (not the add button)
+   181→  → FoodDetailModal opens
+   182→  → Shows: Image, Name, Restaurant, Description, Price
+   183→  → Quantity selector: - [1] +
+   184→  → User adjusts quantity
+   185→  → Price updates dynamically (quantity × unit price)
+   186→  → User clicks "Add to Cart — ₦5,000"
+   187→  → Cart store addItem() called with quantity
+   188→  → Toast: "Jollof Rice added to cart"
+   189→  → Modal closes after 500ms delay
+   190→  → Cart badge bounces
+   191→```
+   192→
+   193→**Scenario 3: Item Already in Cart**
+   194→```
+   195→User clicks "Add to Cart" for item already in cart
+   196→  → Cart store addItem() checks for existing item
+   197→  → Quantity incremented by 1
+   198→  → Toast: "Jollof Rice quantity updated"
+   199→  → Cart badge bounces
+   200→```
+   201→
+   202→### 1.4 Cart Remove Flow
+   203→```
+   204→User clicks delete icon on cart item
+   205→  → Cart store removeItem() called
+   206→  → Item removed from cart
+   207→  → Toast: "Jollof Rice removed from cart"
+   208→  → If cart is now empty: Show empty state
+   209→```
+   210→
+   211→### 1.5 Cart Quantity Update Flow
+   212→```
+   213→User clicks +/- on cart item
+   214→  → incrementQuantity() or decrementQuantity() called
+   215→  → If quantity reaches 0: Remove item (with confirmation? No, just remove)
+   216→  → Price updates in real-time
+   217→  → Delivery fee recalculates (threshold: ₦5,000)
+   218→  → Total updates
+   219→```
+   220→
+   221→### 1.6 Delivery Fee Logic
+   222→
+   223→| Subtotal | Delivery Fee | Display |
+   224→|----------|-------------|---------|
+   225→| ₦0 (empty) | ₦0 | "—" |
+   226→| ₦1 – ₦4,999 | ₦500 | "₦500" |
+   227→| ₦5,000+ | ₦0 | "FREE" (green text) |
+   228→
+   229→**Dynamic display:**
+   230→- When subtotal crosses ₦5,000 threshold: Show "You qualify for FREE delivery! 🎉"
+   231→- When close to threshold: "Add ₦X more for FREE delivery"
+   232→
+   233→---
+   234→
+   235→## 2. Checkout Flow
+   236→
+   237→### 2.1 Checkout Pre-Conditions
+   238→
+   239→Before checkout can proceed, the following must be true:
+   240→
+   241→1. ✅ User is authenticated (if not → show Login modal)
+   242→2. ✅ Cart is not empty (if empty → redirect to Menu)
+   243→3. ✅ All items are still available (check server-side)
+   244→4. ✅ Delivery address is filled
+   245→5. ✅ Phone number is provided
+   246→6. ✅ Payment method is selected
+   247→
+   248→### 2.2 Checkout Step-by-Step Flow
+   249→
+   250→```
+   251→Step 1: Cart Review
+   252→├── User opens cart panel
+   253→├── Reviews items, quantities, prices
+   254→├── Adjusts quantities if needed
+   255→├── Sees subtotal, delivery fee, total
+   256→└── Clicks "Proceed to Checkout"
+   257→
+   258→Step 2: Delivery Information
+   259→├── Checkout panel opens (slides in from right, replaces cart)
+   260→├── Pre-filled fields from user profile:
+   261→│   ├── Full Name (from user.name)
+   262→│   ├── Phone (from user.phone)
+   263→│   ├── Address (from user.address)
+   264→│   ├── City (from user.city)
+   265→│   └── State (from user.state)
+   266→├── Delivery Instructions (optional textarea)
+   267→├── Validation: Required fields highlighted
+   268→└── On valid: Proceed to payment
+   269→
+   270→Step 3: Payment Method Selection
+   271→├── Option A: Paystack (Card, Bank, USSD)
+   272→│   ├── Radio button selected
+   273→│   └── Paystack badge/logo shown
+   274→├── Option B: Cash on Delivery
+   275→│   ├── Radio button selected
+   276→│   └── "Pay when you receive your order" text
+   277→└── Selected method stored for order creation
+   278→
+   279→Step 4: Order Summary & Confirmation
+   280→├── Compact item list (name + qty + price)
+   281→├── Subtotal
+   282→├── Delivery fee
+   283→├── Total amount (bold, orange)
+   284→├── Payment method indicator
+   285→├── Delivery address summary
+   286→└── "Place Order" button
+   287→
+   288→Step 5a: Paystack Payment Flow
+   289→├── User clicks "Pay ₦X,XXX"
+   290→├── Loading state on button
+   291→├── POST /api/orders (creates order in DB)
+   292→│   ├── Server verifies prices
+   293→│   ├── Creates order + items
+   294→│   └── Returns orderId
+   295→├── POST /api/paystack/initialize
+   296→│   ├── Creates Paystack transaction
+   297→│   └── Returns authorization URL
+   298→├── Redirect to Paystack checkout page
+   299→│   ├── User enters card/bank details
+   300→│   ├── Paystack processes payment
+   301→│   └── Redirects to callback URL
+   302→├── GET /api/paystack/verify?reference=xxx
+   303→│   ├── Verifies payment with Paystack API
+   304→│   ├── Updates order: paymentStatus = PAID, status = CONFIRMED
+   305→│   └── Creates status history entry
+   306→├── Success redirect to orders page
+   307→│   ├── Cart cleared
+   308→│   ├── Toast: "Order placed successfully! 🎉"
+   309→│   └── Show order detail with confirmation
+   310→└── If payment fails:
+   311→    ├── Redirect back with ?payment=failed
+   312→    ├── Toast: "Payment failed. Please try again."
+   313→    ├── Cart preserved (order exists but unpaid)
+   314→    └── User can retry payment from order detail
+   315→
+   316→Step 5b: Cash on Delivery Flow
+   317→├── User clicks "Place Order (COD)"
+   318→├── Confirmation dialog: "Confirm cash on delivery order?"
+   319→├── POST /api/orders
+   320→│   ├── paymentMethod: COD
+   321→│   ├── paymentStatus: PENDING
+   322→│   └── status: PENDING
+   323→├── Order created successfully
+   324→├── Cart cleared
+   325→├── Toast: "Order placed! Pay on delivery."
+   326→└── Redirect to order detail
+   327→```
+   328→
+   329→### 2.3 Checkout Panel Design
+   330→
+   331→```
+   332→CheckoutPanel
+   333→├── Backdrop (bg-black/50, click → close)
+   334→├── Panel Container (fixed, right-0, w-full md:w-[400px])
+   335→│   ├── Header
+   336→│   │   ├── BackButton (← returns to cart panel)
+   337→│   │   ├── Title ("Secure Checkout" + 🔒)
+   338→│   │   └── Shield Icons (security indicators)
+   339→│   ├── Steps Progress Bar (1-2-3-4 indicators)
+   340→│   ├── Step Content (scrollable)
+   341→│   │   ├── Step 1: Delivery Info Form
+   342→│   │   │   ├── FullName (Input, required)
+   343→│   │   │   ├── Phone (Input, +234 prefix, required)
+   344→│   │   │   ├── Address (Textarea, required)
+   345→│   │   │   ├── City (Select, Nigerian cities)
+   346→│   │   │   ├── State (Select, Nigerian states)
+   347→│   │   │   └── Instructions (Textarea, optional)
+   348→│   │   ├── Step 2: Payment Method
+   349→│   │   │   ├── Paystack Radio
+   350→│   │   │   │   ├── PaystackLogo
+   351→│   │   │   │   └── "Card, Bank Transfer, USSD"
+   352→│   │   │   └── COD Radio
+   353→│   │   │       ├── CashIcon
+   354→│   │   │       └── "Pay on delivery"
+   355→│   │   └── Step 3: Order Summary
+   356→│   │       ├── ItemsList (compact)
+   357→│   │       ├── SubtotalRow
+   358→│   │       ├── DeliveryFeeRow
+   359→│   │       ├── TotalRow (bold)
+   360→│   │       └── DeliveryAddressSummary
+   361→│   ├── Footer
+   362→│   │   ├── TotalAmount (large, bold)
+   363→│   │   └── PlaceOrderButton
+   364→│   │       ├── Paystack: "Pay ₦X,XXX" (orange gradient)
+   365→│   │       └── COD: "Place Order" (orange gradient)
+   366→│   └── SecurityFooter
+   367→│       └── "Secured by Paystack 🔒" (gray text)
+   368→```
+   369→
+   370→### 2.4 Paystack Integration Code
+   371→
+   372→```typescript
+   373→// lib/paystack.ts
+   374→const PAYSTACK_BASE_URL = 'https://api.paystack.co';
+   375→
+   376→interface InitializeTransactionParams {
+   377→  email: string;
+   378→  amount: number;       // In Naira (will be converted to kobo)
+   379→  reference: string;
+   380→  orderId: string;
+   381→  orderNumber: string;
+   382→  callbackUrl: string;
+   383→}
+   384→
+   385→export async function initializeTransaction(params: InitializeTransactionParams) {
+   386→  const response = await fetch(`${PAYSTACK_BASE_URL}/transaction/initialize`, {
+   387→    method: 'POST',
+   388→    headers: {
+   389→      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+   390→      'Content-Type': 'application/json',
+   391→    },
+   392→    body: JSON.stringify({
+   393→      email: params.email,
+   394→      amount: params.amount * 100, // Convert to kobo
+   395→      reference: params.reference,
+   396→      callback_url: params.callbackUrl,
+   397→      metadata: {
+   398→        orderId: params.orderId,
+   399→        orderNumber: params.orderNumber,
+   400→        custom_fields: [
+   401→          { display_name: "Order Number", variable_name: "order_number", value: params.orderNumber },
+   402→        ],
+   403→      },
+   404→    }),
+   405→  });
+   406→
+   407→  const data = await response.json();
+   408→  
+   409→  if (!data.status) {
+   410→    throw new Error(data.message || 'Failed to initialize transaction');
+   411→  }
+   412→
+   413→  return {
+   414→    authorizationUrl: data.data.authorization_url,
+   415→    reference: data.data.reference,
+   416→  };
+   417→}
+   418→
+   419→export async function verifyTransaction(reference: string) {
+   420→  const response = await fetch(`${PAYSTACK_BASE_URL}/transaction/verify/${reference}`, {
+   421→    headers: {
+   422→      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+   423→    },
+   424→  });
+   425→
+   426→  const data = await response.json();
+   427→  
+   428→  if (!data.status) {
+   429→    throw new Error('Transaction verification failed');
+   430→  }
+   431→
+   432→  return {
+   433→    status: data.data.status,       // "success" or "failed"
+   434→    reference: data.data.reference,
+   435→    amount: data.data.amount / 100, // Convert back from kobo
+   436→    paidAt: data.data.paid_at,
+   437→    channel: data.data.channel,     // "card", "bank", "ussd"
+   438→    metadata: data.data.metadata,
+   439→  };
+   440→}
+   441→```
+   442→
+   443→### 2.5 Order Creation API (Price Verification)
+   444→
+   445→```typescript
+   446→// app/api/orders/route.ts (POST handler)
+   447→export async function POST(request: Request) {
+   448→  try {
+   449→    const session = await getAuthSession();
+   450→    if (!session) {
+   451→      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+   452→    }
+   453→
+   454→    const body = await request.json();
+   455→    const validation = orderSchema.safeParse(body);
+   456→    if (!validation.success) {
+   457→      return NextResponse.json({ error: 'Validation failed', details: validation.error.flatten() }, { status: 400 });
+   458→    }
+   459→
+   460→    const { items, deliveryAddress, deliveryCity, deliveryState, customerPhone, customerName, deliveryInstructions, paymentMethod } = validation.data;
+   461→
+   462→    // CRITICAL: Server-side price verification
+   463→    const foodIds = items.map(item => item.foodId);
+   464→    const foods = await db.food.findMany({
+   465→      where: { id: { in: foodIds } },
+   466→      select: { id: true, name: true, image: true, price: true, isAvailable: true },
+   467→    });
+   468→
+   469→    // Verify all foods exist and are available
+   470→    const unavailableItems = foods.filter(f => !f.isAvailable);
+   471→    if (unavailableItems.length > 0) {
+   472→      return NextResponse.json({
+   473→        error: 'Some items are no longer available',
+   474→        details: { unavailableItems: unavailableItems.map(f => f.name) },
+   475→      }, { status: 400 });
+   476→    }
+   477→
+   478→    const missingItems = foodIds.filter(id => !foods.find(f => f.id === id));
+   479→    if (missingItems.length > 0) {
+   480→      return NextResponse.json({ error: 'Some items no longer exist' }, { status: 400 });
+   481→    }
+   482→
+   483→    // Calculate prices using SERVER-SIDE prices (not client-sent)
+   484→    const orderItems = items.map(item => {
+   485→      const food = foods.find(f => f.id === item.foodId)!;
+   486→      const unitPrice = food.price; // Server price, not client price
+   487→      const totalPrice = unitPrice * item.quantity;
+   488→      return {
+   489→        foodId: food.id,
+   490→        foodName: food.name,
+   491→        foodImage: food.image,
+   492→        quantity: item.quantity,
+   493→        unitPrice,
+   494→        totalPrice,
+   495→      };
+   496→    });
+   497→
+   498→    const subtotal = orderItems.reduce((sum, item) => sum + item.totalPrice, 0);
+   499→    const deliveryFee = subtotal >= 5000 ? 0 : 500;
+   500→    const totalAmount = subtotal + deliveryFee;
+   501→
+   502→    // Check if prices changed from client expectations
+   503→    const priceChanges = items.filter(item => {
+   504→      const food = foods.find(f => f.id === item.foodId);
+   505→      return food && food.price !== item.expectedPrice; // Client sends expected price
+   506→    });
+   507→
+   508→    if (priceChanges.length > 0) {
+   509→      return NextResponse.json({
+   510→        error: 'Prices have changed',
+   511→        details: { priceChanges: priceChanges.map(item => {
+   512→          const food = foods.find(f => f.id === item.foodId)!;
+   513→          return { name: food.name, oldPrice: item.expectedPrice, newPrice: food.price };
+   514→        })},
+   515→      }, { status: 409 }); // 409 Conflict
+   516→    }
+   517→
+   518→    // Generate order number
+   519→    const orderNumber = await generateOrderNumber();
+   520→
+   521→    // Create order
+   522→    const order = await db.order.create({
+   523→      data: {
+   524→        orderNumber,
+   525→        userId: session.user.id,
+   526→        subtotal,
+   527→        deliveryFee,
+   528→        totalAmount,
+   529→        paymentMethod,
+   530→        paymentStatus: 'PENDING',
+   531→        status: 'PENDING',
+   532→        deliveryAddress,
+   533→        deliveryCity,
+   534→        deliveryState,
+   535→        customerPhone,
+   536→        customerName,
+   537→        deliveryInstructions,
+   538→        items: { create: orderItems },
+   539→        statusHistory: {
+   540→          create: {
+   541→            status: 'PENDING',
+   542→            remark: 'Order placed',
+   543→            changedBy: session.user.id,
+   544→          },
+   545→        },
+   546→      },
+   547→      include: { items: true, statusHistory: true },
+   548→    });
+   549→
+   550→    // If Paystack payment, initialize transaction
+   551→    if (paymentMethod === 'PAYSTACK') {
+   552→      const { authorizationUrl, reference } = await initializeTransaction({
+   553→        email: session.user.email!,
+   554→        amount: totalAmount,
+   555→        reference: `NJB-${orderNumber}-${Date.now()}`,
+   556→        orderId: order.id,
+   557→        orderNumber: orderNumber,
+   558→        callbackUrl: `${process.env.NEXT_PUBLIC_BASE_URL}/api/paystack/verify`,
+   559→      });
+   560→
+   561→      // Update order with Paystack reference
+   562→      await db.order.update({
+   563→        where: { id: order.id },
+   564→        data: { paystackRef: reference },
+   565→      });
+   566→
+   567→      return NextResponse.json({
+   568→        data: {
+   569→          orderId: order.id,
+   570→          orderNumber,
+   571→          totalAmount,
+   572→          paystackUrl: authorizationUrl,
+   573→        },
+   574→        message: 'Order created. Redirecting to payment...',
+   575→      }, { status: 201 });
+   576→    }
+   577→
+   578→    // COD order
+   579→    return NextResponse.json({
+   580→      data: {
+   581→        orderId: order.id,
+   582→        orderNumber,
+   583→        totalAmount,
+   584→      },
+   585→      message: 'Order placed successfully!',
+   586→    }, { status: 201 });
+   587→
+   588→  } catch (error) {
+   589→    console.error('Order creation error:', error);
+   590→    return NextResponse.json({ error: 'Something went wrong' }, { status: 500 });
+   591→  }
+   592→}
+   593→```
+   594→
+   595→---
+   596→
+   597→## 3. Price Change Handling
+   598→
+   599→### 3.1 Scenario: Price Changed Between Add-to-Cart and Checkout
+   600→
+   601→**Detection:**
+   602→- Client sends `expectedPrice` with each cart item during checkout
+   603→- Server compares `expectedPrice` with actual `food.price`
+   604→- If mismatch → 409 Conflict response
+   605→
+   606→**Resolution Options:**
+   607→
+   608→**Option A: Notify and Re-price (Recommended)**
+   609→```
+   610→Server returns 409 with price changes
+   611→  → Client shows modal: "Prices have changed"
+   612→  → Lists each changed item: "Jollof Rice: ₦2,500 → ₦3,000"
+   613→  → User can: "Update Prices & Continue" or "Remove Changed Items" or "Cancel"
+   614→  → If user accepts: Cart store updates prices, re-submit checkout
+   615→```
+   616→
+   617→**Option B: Notify and Halt**
+   618→```
+   619→Server returns 409
+   620→  → Client shows: "Some prices have changed. Please review your cart."
+   621→  → Cart panel opens with updated prices highlighted
+   622→  → User reviews and manually adjusts
+   623→  → User re-attempts checkout
+   624→```
+   625→
+   626→### 3.2 Scenario: Food Unavailable at Checkout
+   627→
+   628→**Detection:**
+   629→- Server checks `food.isAvailable` for all items
+   630→- If any item is unavailable → 400 response
+   631→
+   632→**Resolution:**
+   633→```
+   634→Server returns 400 with unavailable items
+   635→  → Client shows modal: "Some items are no longer available"
+   636→  → Lists unavailable items
+   637→  → Options: "Remove Unavailable Items" or "Cancel Order"
+   638→  → If remove: Cart store removes those items, re-submit
+   639→```
+   640→
+   641→### 3.3 Scenario: Food Deleted at Checkout
+   642→
+   643→**Detection:**
+   644→- Server looks up foodIds, some not found
+   645→- 400 response with missing items
+   646→
+   647→**Resolution:**
+   648→```
+   649→Server returns 400 with missing items
+   650→  → Client shows: "Some items are no longer available"
+   651→  → Cart store removes missing items
+   652→  → Re-submit checkout
+   653→```
+   654→
+   655→---
+   656→
+   657→## 4. Order Status Lifecycle
+   658→
+   659→### 4.1 Status Flow Diagram
+   660→
+   661→```
+   662→                    ┌─────────────────────────────────┐
+   663→                    │          PENDING                 │
+   664→                    │  (Order just placed)             │
+   665→                    └──────┬──────────┬────────────────┘
+   666→                           │          │
+   667→                    Admin  │          │  Customer/Admin
+   668→                    confirms│          │  cancels
+   669→                           │          │
+   670→                    ┌──────▼──┐   ┌───▼────────────────┐
+   671→                    │CONFIRMED│   │    CANCELLED        │
+   672→                    │         │   │  (Refund if paid)   │
+   673→                    └──────┬──┘   └────────────────────┘
+   674→                           │
+   675→                    Admin  │
+   676→                    starts │
+   677→                    cooking│
+   678→                           │
+   679→                    ┌──────▼──────┐   ┌────────────────┐
+   680→                    │  PREPARING  ├──→│   CANCELLED     │
+   681→                    │  (Cooking)  │   └────────────────┘
+   682→                    └──────┬──────┘
+   683→                           │
+   684→                    Out for│
+   685→                    delivery│
+   686→                           │
+   687→                    ┌──────▼──────┐   ┌────────────────┐
+   688→                    │  ON_THE_WAY ├──→│   CANCELLED     │
+   689→                    │  (Delivery) │   └────────────────┘
+   690→                    └──────┬──────┘
+   691→                           │
+   692→                    Delivered│
+   693→                           │
+   694→                    ┌──────▼──────┐
+   695→                    │  DELIVERED  │
+   696→                    │  (Complete) │
+   697→                    └─────────────┘
+   698→```
+   699→
+   700→### 4.2 Status Duration Estimates
+   701→
+   702→| Status | Typical Duration | Auto-transition? |
+   703→|--------|-----------------|------------------|
+   704→| PENDING | 1-5 minutes | No (admin action required) |
+   705→| CONFIRMED | 5-15 minutes | No (admin action) |
+   706→| PREPARING | 15-45 minutes | No (admin action) |
+   707→| ON_THE_WAY | 15-60 minutes | No (admin action) |
+   708→| DELIVERED | Terminal | N/A |
+   709→| CANCELLED | Terminal | N/A |
+   710→
+   711→### 4.3 Status Change Notifications
+   712→
+   713→For each status change, the customer should see:
+   714→- Updated status badge on order card
+   715→- Status timeline update on order detail
+   716→- (Future: Push notification / SMS)
+   717→
+   718→---
+   719→
+   720→## 5. Paystack Webhook Handling
+   721→
+   722→### 5.1 Webhook Events to Handle
+   723→
+   724→| Event | Action |
+   725→|-------|--------|
+   726→| `charge.success` | Update order: paymentStatus = PAID, status = CONFIRMED |
+   727→| `charge.failed` | Update order: paymentStatus = FAILED |
+   728→| `refund.processed` | Update order: paymentStatus = REFUNDED |
+   729→| `transfer.failed` | Log for investigation |
+   730→
+   731→### 5.2 Webhook Implementation
+   732→
+   733→```typescript
+   734→// app/api/paystack/webhook/route.ts
+   735→import { headers } from 'next/headers';
+   736→import crypto from 'crypto';
+   737→import { db } from '@/lib/db';
+   738→
+   739→export async function POST(request: Request) {
+   740→  try {
+   741→    const body = await request.text();
+   742→    const signature = headers().get('x-paystack-signature');
+   743→
+   744→    // Verify webhook signature
+   745→    const hash = crypto
+   746→      .createHmac('sha512', process.env.PAYSTACK_WEBHOOK_SECRET!)
+   747→      .update(body)
+   748→      .digest('hex');
+   749→
+   750→    if (hash !== signature) {
+   751→      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
+   752→    }
+   753→
+   754→    const event = JSON.parse(body);
+   755→
+   756→    switch (event.event) {
+   757→      case 'charge.success': {
+   758→        const reference = event.data.reference;
+   759→        const order = await db.order.findFirst({
+   760→          where: { paystackRef: reference },
+   761→        });
+   762→
+   763→        if (order && order.paymentStatus !== 'PAID') {
+   764→          await db.order.update({
+   765→            where: { id: order.id },
+   766→            data: {
+   767→              paymentStatus: 'PAID',
+   768→              status: 'CONFIRMED',
+   769→            },
+   770→          });
+   771→
+   772→          await db.orderStatusHistory.create({
+   773→            data: {
+   774→              orderId: order.id,
+   775→              status: 'CONFIRMED',
+   776→              remark: `Payment confirmed via Paystack (${event.data.channel})`,
+   777→              changedBy: 'system',
+   778→            },
+   779→          });
+   780→        }
+   781→        break;
+   782→      }
+   783→
+   784→      case 'charge.failed': {
+   785→        const reference = event.data.reference;
+   786→        const order = await db.order.findFirst({
+   787→          where: { paystackRef: reference },
+   788→        });
+   789→
+   790→        if (order) {
+   791→          await db.order.update({
+   792→            where: { id: order.id },
+   793→            data: { paymentStatus: 'FAILED' },
+   794→          });
+   795→        }
+   796→        break;
+   797→      }
+   798→
+   799→      case 'refund.processed': {
+   800→        const reference = event.data.reference;
+   801→        const order = await db.order.findFirst({
+   802→          where: { paystackRef: reference },
+   803→        });
+   804→
+   805→        if (order) {
+   806→          await db.order.update({
+   807→            where: { id: order.id },
+   808→            data: { paymentStatus: 'REFUNDED' },
+   809→          });
+   810→        }
+   811→        break;
+   812→      }
+   813→    }
+   814→
+   815→    return NextResponse.json({ received: true }, { status: 200 });
+   816→  } catch (error) {
+   817→    console.error('Webhook error:', error);
+   818→    return NextResponse.json({ error: 'Webhook processing failed' }, { status: 500 });
+   819→  }
+   820→}
+   821→```
+   822→
+   823→---
+   824→
+   825→## 6. Refund Flow
+   826→
+   827→### 6.1 When Refunds Are Needed
+   828→- Customer cancels a PAID order
+   829→- Admin cancels a PAID order
+   830→- Double payment (duplicate transaction)
+   831→- Payment for unavailable items
+   832→
+   833→### 6.2 Refund Process
+   834→
+   835→```typescript
+   836→// lib/paystack.ts (add refund function)
+   837→export async function initiateRefund(transactionReference: string, amount?: number) {
+   838→  const response = await fetch(`${PAYSTACK_BASE_URL}/refund`, {
+   839→    method: 'POST',
+   840→    headers: {
+   841→      Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
+   842→      'Content-Type': 'application/json',
+   843→    },
+   844→    body: JSON.stringify({
+   845→      transaction: transactionReference,
+   846→      amount: amount ? amount * 100 : undefined, // Partial refund in kobo; undefined = full refund
+   847→      reason: 'Order cancellation',
+   848→    }),
+   849→  });
+   850→
+   851→  const data = await response.json();
+   852→  return data;
+   853→}
+   854→```
+   855→
+   856→### 6.3 Refund Flow on Cancellation
+   857→```
+   858→Admin/User cancels a PAID order
+   859→  → PUT /api/orders { id, status: CANCELLED }
+   860→  → Server checks: Was this order PAID via Paystack?
+   861→  → If yes:
+   862→    → Call initiateRefund(paystackRef)
+   863→    → Update order: paymentStatus = REFUNDED
+   864→    → Create status history: "Order cancelled, refund initiated"
+   865→    → Return: "Order cancelled. Refund will be processed within 3-5 business days."
+   866→  → If COD:
+   867→    → Update order: status = CANCELLED
+   868→    → No refund needed
+   869→```
+   870→
+   871→---
+   872→
+   873→## 7. Edge Cases & Error Handling
+   874→
+   875→### 7.1 Cart Edge Cases
+   876→
+   877→| Case | Handling |
+   878→|------|----------|
+   879→| Empty cart checkout | Disable checkout button, show empty state |
+   880→| Cart total is ₦0 | Not possible (min 1 item with price > 0) |
+   881→| Negative quantity | Prevented by UI (min 1) and server validation |
+   882→| Quantity > 99 | Prevented by UI and server validation (max 99) |
+   883→| All items from different restaurants | Allowed (no restaurant restriction) |
+   884→| Item becomes unavailable while in cart | Show "Unavailable" badge, disable checkout for that item |
+   885→| localStorage corrupted | Reset cart, show message |
+   886→| localStorage quota exceeded | Clear old items, show warning |
+   887→| Two browser tabs | Cart may diverge (acceptable for v1) |
+   888→
+   889→### 7.2 Checkout Edge Cases
+   890→
+   891→| Case | Handling |
+   892→|------|----------|
+   893→| Not logged in | Show Login modal first |
+   894→| Session expired during checkout | Redirect to login, preserve cart |
+   895→| Network error during order creation | Show error toast, allow retry |
+   896→| Network error during Paystack init | Show error toast, allow retry |
+   897→| Paystack page closed without paying | Order exists (PENDING), user can retry from orders |
+   898→| Double-click "Place Order" | Debounce button, disable after first click |
+   899→| Browser back during Paystack | Paystack handles redirect |
+   900→| Payment success but verify fails | Webhook backup will update order |
+   901→| Price changed during checkout | 409 response, show price change modal |
+   902→| Food deleted during checkout | 400 response, remove from cart |
+   903→| Partial payment (Paystack) | Not possible with Paystack Checkout |
+   904→| Paystack downtime | Show "Payment service unavailable, try COD" |
+   905→
+   906→### 7.3 Order Edge Cases
+   907→
+   908→| Case | Handling |
+   909→|------|----------|
+   910→| Cancel paid order | Initiate refund via Paystack |
+   911→| Cancel COD order | Just update status |
+   912→| Order stuck in PENDING | Admin can update status or cancel |
+   913→| Order stuck in payment | Check Paystack dashboard, use webhook |
+   914→| Multiple orders same time | Each gets unique order number |
+   915→| Very large order (₦100k+) | Allow, no cap (admin can review) |
+   916→| Order with many items (50+) | Allow, paginate in detail view |
+   917→
+   918→---
+   919→
+   920→## 8. Agentic Prompt for Cart & Checkout Implementation
+   921→
+   922→```
+   923→You are implementing the CART & CHECKOUT system for NaijaBites, a Nigerian food ordering web application.
+   924→
+   925→## Cart Store (Zustand + localStorage)
+   926→1. Create stores/cart-store.ts with full interface (items, open/close panel, add/remove/update, computed values)
+   927→2. Persist only items to localStorage (key: 'naijabites-cart')
+   928→3. Computed: getSubtotal(), getDeliveryFee() (free over ₦5,000), getTotal(), getItemCount()
+   929→4. addItem: Check for existing item → increment qty or add new
+   930→5. removeItem: Filter out by foodId, show toast
+   931→6. updateQuantity: Min 1 (remove if 0), max 99
+   932→7. clearCart: Empty items array
+   933→8. Cart badge bounce animation on add
+   934→
+   935→## Cart Panel UI
+   936→1. Slide-in from right (Framer Motion, x: "100%" → 0)
+   937→2. Dark theme body (bg-gray-900, rounded-t-3xl)
+   938→3. Light header (bg-white, back arrow + "Your Cart" + clear button)
+   939→4. Cart item rows: bg-gray-700, circular food image, +/- controls, delete button
+   940→5. Footer: Subtotal, delivery fee, total, "Proceed to Checkout" button (orange gradient)
+   941→6. Empty state: SVG illustration + "Cart is empty" + "Browse Menu" link
+   942→7. Custom scrollbar (orange-500 thumb)
+   943→8. Delivery fee logic: Free over ₦5,000, else ₦500
+   944→
+   945→## Checkout Panel UI
+   946→1. Same slide-in pattern (replaces cart panel)
+   947→2. Step-by-step: Delivery Info → Payment Method → Order Summary
+   948→3. Delivery form: Name, Phone (+234), Address, City (dropdown), State (dropdown), Instructions
+   949→4. Pre-filled from user profile
+   950→5. Payment: Paystack (Card/Bank/USSD) or Cash on Delivery
+   951→6. Order summary: Compact items list, totals, delivery address
+   952→7. "Pay ₦X,XXX" (Paystack) or "Place Order" (COD)
+   953→8. Security footer: "Secured by Paystack 🔒"
+   954→
+   955→## Checkout API Integration
+   956→1. POST /api/orders — Create order with server-side price verification
+   957→2. Client sends expectedPrice for each item, server compares with actual price
+   958→3. If price changed: 409 response with price changes, client shows modal
+   959→4. If item unavailable: 400 response, client shows modal
+   960→5. If Paystack: POST /api/paystack/initialize → redirect to Paystack
+   961→6. If COD: Order created with PENDING status, show confirmation
+   962→
+   963→## Paystack Integration
+   964→1. Initialize transaction: Call Paystack API, get authorization URL
+   965→2. Redirect user to Paystack checkout page
+   966→3. On callback: GET /api/paystack/verify → verify transaction
+   967→4. On success: Update order (PAID, CONFIRMED), clear cart, redirect to orders
+   968→5. On failure: Show error, preserve cart, order exists as PENDING
+   969→6. Webhook backup: POST /api/paystack/webhook for server-to-server confirmation
+   970→7. Verify webhook signature with HMAC-SHA512
+   971→
+   972→## Refund Flow
+   973→1. Cancel paid order → initiate Paystack refund
+   974→2. Cancel COD order → just update status
+   975→3. Refund processed within 3-5 business days (message to user)
+   976→
+   977→## Edge Cases to Handle
+   978→- Empty cart checkout: Disabled button
+   979→- Not logged in: Show login modal
+   980→- Price changes: 409 response, show update modal
+   981→- Unavailable items: 400 response, remove from cart
+   982→- Network errors: Error toast, retry button
+   983→- Double-click: Debounce, disable button
+   984→- Payment closed: Order exists as PENDING, can retry
+   985→- localStorage corruption: Reset cart
+   986→
+   987→## Nigerian Context
+   988→- Currency: Nigerian Naira (₦) with red symbol
+   989→- Phone: +234 prefix, 11-digit validation
+   990→- Cities: Lagos, Abuja, Port Harcourt, etc.
+   991→- States: All 37 Nigerian states/FCT
+   992→- Delivery fee: ₦500 flat, free over ₦5,000
+   993→- Paystack: Supports Card, Bank Transfer, USSD (Nigerian methods)
+   994→```
+   995→

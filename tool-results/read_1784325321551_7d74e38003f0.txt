@@ -1,0 +1,748 @@
+     1→# Project Overview & Architecture Planning
+     2→
+     3→## 1. Project Identity
+     4→
+     5→**Name:** NaijaBites — Nigerian Food Ordering System  
+     6→**Tagline:** "Order your favourite Nigerian meals, delivered fast!"  
+     7→**Target Market:** Nigeria (NGN currency, Paystack integration)  
+     8→**Project Type:** Nigeria Student Project (Full-Stack Web Application)
+     9→
+    10→---
+    11→
+    12→## 2. Technology Stack (MANDATORY — NON-NEGOTIABLE)
+    13→
+    14→| Layer | Technology | Version | Notes |
+    15→|-------|-----------|---------|-------|
+    16→| **Framework** | Next.js | 16 | App Router, Server Components |
+    17→| **Language** | TypeScript | 5 | Strict mode enabled |
+    18→| **Styling** | Tailwind CSS | 4 | With custom theme |
+    19→| **UI Library** | HeroUI v2 | Latest | Component library (replaces NextUI/shadcn) |
+    20→| **Database** | PostgreSQL | Latest | Via Prisma ORM |
+    21→| **ORM** | Prisma | Latest | PostgreSQL client |
+    22→| **Authentication** | NextAuth.js | v4 | Credentials provider only (NO social login, NO email verification) |
+    23→| **Payment** | Paystack | Latest | Nigerian payment gateway (test keys, add later) |
+    24→| **State Management** | Zustand | Latest | Client-side cart & UI state |
+    25→| **Server State** | TanStack Query | Latest | Data fetching & caching |
+    26→| **Icons** | Lucide React | Latest | Icon library |
+    27→| **Image Storage** | Local filesystem | — | Upload to `public/uploads/` directory |
+    28→| **Animations** | Framer Motion | Latest | Page transitions, micro-interactions |
+    29→| **Toast Notifications** | react-hot-toast | Latest | User feedback |
+    30→| **Caching** | In-memory | — | No Redis/MySQL middleware |
+    31→
+    32→---
+    33→
+    34→## 3. Architecture Overview
+    35→
+    36→```
+    37→┌─────────────────────────────────────────────────────┐
+    38→│                    CLIENT (Browser)                  │
+    39→│  ┌───────────┐ ┌──────────┐ ┌──────────────────┐   │
+    40→│  │  Zustand   │ │ TanStack │ │  Framer Motion   │   │
+    41→│  │  (Cart/UI) │ │  Query   │ │  (Animations)    │   │
+    42→│  └───────────┘ └──────────┘ └──────────────────┘   │
+    43→│  ┌─────────────────────────────────────────────┐    │
+    44→│  │           HeroUI v2 Components               │    │
+    45→│  │  (Button, Card, Table, Modal, Input, etc.)   │    │
+    46→│  └─────────────────────────────────────────────┘    │
+    47→└─────────────────────────────────────────────────────┘
+    48→                        │
+    49→                   HTTP/WebSocket
+    50→                        │
+    51→┌─────────────────────────────────────────────────────┐
+    52→│              NEXT.JS 16 (App Router)                 │
+    53→│  ┌─────────────┐  ┌─────────────┐  ┌────────────┐  │
+    54→│  │  Server      │  │  API Routes │  │  Middleware │  │
+    55→│  │  Components  │  │  (/api/*)   │  │  (auth)     │  │
+    56→│  └─────────────┘  └─────────────┘  └────────────┘  │
+    57→│  ┌──────────────────────────────────────────────┐   │
+    58→│  │              Prisma ORM                       │   │
+    59→│  │  (Schema → PostgreSQL Client)                 │   │
+    60→│  └──────────────────────────────────────────────┘   │
+    61→└─────────────────────────────────────────────────────┘
+    62→                        │
+    63→┌─────────────────────────────────────────────────────┐
+    64→│              PostgreSQL Database                     │
+    65→│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐ ┌─────────┐  │
+    66→│  │Users │ │Categ.│ │Rest. │ │Foods │ │ Orders   │  │
+    67→│  └──────┘ └──────┘ └──────┘ └──────┘ └─────────┘  │
+    68→└─────────────────────────────────────────────────────┘
+    69→                        │
+    70→┌─────────────────────────────────────────────────────┐
+    71→│              Paystack Payment Gateway                │
+    72→│  (Card, Bank Transfer, USSD, Mobile Money)          │
+    73→└─────────────────────────────────────────────────────┘
+    74→```
+    75→
+    76→---
+    77→
+    78→## 4. Route Architecture
+    79→
+    80→Since the project runs on a **single visible route** (`/`), all features are implemented as **client-side tabs/sections/modals** — NOT as separate Next.js routes.
+    81→
+    82→### Client-Side Navigation (Tab/Section Based)
+    83→
+    84→| Section | Component | Access |
+    85→|---------|-----------|--------|
+    86→| Home | `HomeSection` | Public |
+    87→| Restaurants | `RestaurantsSection` | Public |
+    88→| Menu | `MenuSection` | Public |
+    89→| Cart | `CartPanel` (slide-in overlay) | Authenticated |
+    90→| My Orders | `OrdersSection` | Authenticated |
+    91→| Profile | `ProfileSection` | Authenticated |
+    92→| Checkout | `CheckoutPanel` (slide-in overlay) | Authenticated |
+    93→
+    94→### Admin Navigation (Tab-Based within Admin View)
+    95→
+    96→| Section | Component | Access |
+    97→|---------|-----------|--------|
+    98→| Dashboard | `AdminDashboard` | Admin Only |
+    99→| Restaurants | `AdminRestaurants` | Admin Only |
+   100→| Food Categories | `AdminCategories` | Admin Only |
+   101→| Food Menu | `AdminMenuItems` | Admin Only |
+   102→| Orders | `AdminOrders` | Admin Only |
+   103→| Customers | `AdminCustomers` | Admin Only |
+   104→| Earnings | `AdminEarnings` | Admin Only |
+   105→
+   106→### API Routes (Backend)
+   107→
+   108→| Method | Route | Description | Auth |
+   109→|--------|-------|-------------|------|
+   110→| POST | `/api/auth/register` | Register new user | Public |
+   111→| POST | `/api/auth/[...nextauth]` | NextAuth handler | Public |
+   112→| GET | `/api/categories` | List all categories | Public |
+   113→| POST | `/api/categories` | Create category | Admin |
+   114→| PUT | `/api/categories` | Update category | Admin |
+   115→| DELETE | `/api/categories` | Delete category | Admin |
+   116→| GET | `/api/restaurants` | List all restaurants | Public |
+   117→| POST | `/api/restaurants` | Create restaurant | Admin |
+   118→| PUT | `/api/restaurants` | Update restaurant | Admin |
+   119→| DELETE | `/api/restaurants` | Delete restaurant | Admin |
+   120→| GET | `/api/foods` | List foods (with filters) | Public |
+   121→| POST | `/api/foods` | Create food item | Admin |
+   122→| PUT | `/api/foods` | Update food item | Admin |
+   123→| DELETE | `/api/foods` | Delete food item | Admin |
+   124→| GET | `/api/orders` | List orders (own/admin) | Authenticated |
+   125→| POST | `/api/orders` | Create order | Authenticated |
+   126→| PUT | `/api/orders` | Update order status | Admin |
+   127→| DELETE | `/api/orders` | Cancel/delete order | Admin/Auth |
+   128→| GET | `/api/users` | List all users | Admin |
+   129→| PUT | `/api/users` | Update user | Admin |
+   130→| DELETE | `/api/users` | Delete user | Admin |
+   131→| GET | `/api/profile` | Get current user profile | Authenticated |
+   132→| PUT | `/api/profile` | Update current user profile | Authenticated |
+   133→| POST | `/api/upload` | Upload image | Admin |
+   134→| POST | `/api/paystack/initialize` | Initialize Paystack payment | Authenticated |
+   135→| GET | `/api/paystack/verify` | Verify Paystack payment | Public (webhook) |
+   136→| GET | `/api/dashboard/stats` | Dashboard statistics | Admin |
+   137→| GET | `/api/dashboard/earnings` | Earnings data | Admin |
+   138→
+   139→---
+   140→
+   141→## 5. Database Schema (PostgreSQL via Prisma)
+   142→
+   143→### Complete Schema Design
+   144→
+   145→```prisma
+   146→generator client {
+   147→  provider = "prisma-client-js"
+   148→}
+   149→
+   150→datasource db {
+   151→  provider = "postgresql"
+   152→  url      = env("DATABASE_URL")
+   153→}
+   154→
+   155→model User {
+   156→  id            String    @id @default(cuid())
+   157→  name          String
+   158→  email         String    @unique
+   159→  password      String    // bcrypt hashed
+   160→  phone         String?
+   161→  address       String?
+   162→  city          String?
+   163→  state         String?
+   164→  avatar        String?   // URL to uploaded image
+   165→  role          Role      @default(CUSTOMER)
+   166→  status        UserStatus @default(ACTIVE)
+   167→  createdAt     DateTime  @default(now())
+   168→  updatedAt     DateTime  @updatedAt
+   169→
+   170→  orders        Order[]
+   171→  
+   172→  @@map("users")
+   173→}
+   174→
+   175→enum Role {
+   176→  CUSTOMER
+   177→  ADMIN
+   178→}
+   179→
+   180→enum UserStatus {
+   181→  ACTIVE
+   182→  BLOCKED
+   183→}
+   184→
+   185→model Category {
+   186→  id            String    @id @default(cuid())
+   187→  name          String    @unique
+   188→  description   String?
+   189→  image         String?
+   190→  createdAt     DateTime  @default(now())
+   191→  updatedAt     DateTime  @updatedAt
+   192→
+   193→  restaurants   Restaurant[]
+   194→  foods         Food[]
+   195→  
+   196→  @@map("categories")
+   197→}
+   198→
+   199→model Restaurant {
+   200→  id            String    @id @default(cuid())
+   201→  name          String
+   202→  description   String?
+   203→  email         String?
+   204→  phone         String?
+   205→  address       String?
+   206→  city          String?
+   207→  state         String?
+   208→  openTime      String?   // e.g. "08:00"
+   209→  closeTime     String?   // e.g. "22:00"
+   210→  openDays      String?   // e.g. "Mon-Sat"
+   211→  image         String?
+   212→  isActive      Boolean   @default(true)
+   213→  categoryId    String
+   214→  category      Category  @relation(fields: [categoryId], references: [id], onDelete=Cascade)
+   215→  createdAt     DateTime  @default(now())
+   216→  updatedAt     DateTime  @updatedAt
+   217→
+   218→  foods         Food[]
+   219→  orders        Order[]
+   220→  
+   221→  @@map("restaurants")
+   222→}
+   223→
+   224→model Food {
+   225→  id            String    @id @default(cuid())
+   226→  name          String
+   227→  description   String?
+   228→  price         Float     // Base price in NGN
+   229→  image         String?
+   230→  isAvailable   Boolean   @default(true)
+   231→  categoryId    String
+   232→  category      Category  @relation(fields: [categoryId], references: [id], onDelete=Cascade)
+   233→  restaurantId  String
+   234→  restaurant    Restaurant @relation(fields: [restaurantId], references: [id], onDelete=Cascade)
+   235→  createdAt     DateTime  @default(now())
+   236→  updatedAt     DateTime  @updatedAt
+   237→
+   238→  orderItems    OrderItem[]
+   239→  
+   240→  @@map("foods")
+   241→}
+   242→
+   243→model Order {
+   244→  id            String    @id @default(cuid())
+   245→  orderNumber   String    @unique // Auto-generated e.g. "ORD-20240101-001"
+   246→  userId        String
+   247→  user          User      @relation(fields: [userId], references: [id])
+   248→  restaurantId  String?
+   249→  restaurant    Restaurant? @relation(fields: [restaurantId], references: [id])
+   250→  status        OrderStatus @default(PENDING)
+   251→  subtotal      Float     // Sum of items before delivery
+   252→  deliveryFee   Float     @default(0) // Delivery fee
+   253→  totalAmount   Float     // subtotal + deliveryFee
+   254→  paymentMethod PaymentMethod @default(PAYSTACK)
+   255→  paymentStatus PaymentStatus @default(PENDING)
+   256→  paystackRef   String?   // Paystack transaction reference
+   257→  deliveryAddress String?
+   258→  deliveryCity    String?
+   259→  deliveryState   String?
+   260→  customerPhone   String?
+   261→  customerName    String?
+   262→  remark        String?
+   263→  cancelledAt   DateTime?
+   264→  deliveredAt   DateTime?
+   265→  createdAt     DateTime  @default(now())
+   266→  updatedAt     DateTime  @updatedAt
+   267→
+   268→  items         OrderItem[]
+   269→  statusHistory OrderStatusHistory[]
+   270→  
+   271→  @@map("orders")
+   272→}
+   273→
+   274→enum OrderStatus {
+   275→  PENDING        // Just placed, awaiting confirmation
+   276→  CONFIRMED      // Restaurant confirmed
+   277→  PREPARING      // Food being prepared
+   278→  ON_THE_WAY     // Out for delivery
+   279→  DELIVERED      // Successfully delivered
+   280→  CANCELLED      // Cancelled by user or admin
+   281→}
+   282→
+   283→enum PaymentMethod {
+   284→  PAYSTACK       // Paystack (card, transfer, USSD)
+   285→  COD            // Cash on Delivery
+   286→}
+   287→
+   288→enum PaymentStatus {
+   289→  PENDING
+   290→  PAID
+   291→  FAILED
+   292→  REFUNDED
+   293→}
+   294→
+   295→model OrderItem {
+   296→  id            String    @id @default(cuid())
+   297→  orderId       String
+   298→  order         Order     @relation(fields: [orderId], references: [id], onDelete=Cascade)
+   299→  foodId        String
+   300→  foodName      String    // Snapshot at order time
+   301→  foodImage     String?   // Snapshot at order time
+   302→  quantity      Int       @default(1)
+   303→  unitPrice     Float     // Price per unit at order time
+   304→  totalPrice    Float     // quantity * unitPrice
+   305→  
+   306→  @@map("order_items")
+   307→}
+   308→
+   309→model OrderStatusHistory {
+   310→  id            String    @id @default(cuid())
+   311→  orderId       String
+   312→  order         Order     @relation(fields: [orderId], references: [id], onDelete=Cascade)
+   313→  status        OrderStatus
+   314→  remark        String?
+   315→  changedBy     String?   // User ID or "system"
+   316→  createdAt     DateTime  @default(now())
+   317→  
+   318→  @@map("order_status_history")
+   319→}
+   320→
+   321→model AdminStats {
+   322→  id            String    @id @default(cuid())
+   323→  totalOrders   Int       @default(0)
+   324→  totalRevenue  Float     @default(0)
+   325→  totalUsers    Int       @default(0)
+   326→  totalFoods    Int       @default(0)
+   327→  totalRestaurants Int    @default(0)
+   328→  updatedAt     DateTime  @updatedAt
+   329→  
+   330→  @@map("admin_stats")
+   331→}
+   332→```
+   333→
+   334→### ER Diagram
+   335→
+   336→```
+   337→Category (1) ──→ (N) Restaurant (1) ──→ (N) Food
+   338→Category (1) ──→ (N) Food (via direct category link for filtering)
+   339→
+   340→User (1) ──→ (N) Order (1) ──→ (N) OrderItem ──→ Food (snapshot)
+   341→Order (1) ──→ (N) OrderStatusHistory
+   342→Restaurant (1) ──→ (N) Order (via restaurant context)
+   343→```
+   344→
+   345→---
+   346→
+   347→## 6. Design System (Based on Bentilzone + Nigerian Context)
+   348→
+   349→### Color Palette
+   350→
+   351→| Token | Hex | Usage |
+   352→|-------|-----|-------|
+   353→| `primary` | `#f97316` (orange-500) | Brand color, CTAs, active states, accents |
+   354→| `primary-dark` | `#ea580c` (orange-600) | Hover states, admin sidebar |
+   355→| `primary-light` | `#fb923c` (orange-400) | Light accents, gradients |
+   356→| `primary-50` | `#fff7ed` (orange-50) | Light backgrounds |
+   357→| `accent` | `#16a34a` (green-600) | Success, delivered status, admin edit |
+   358→| `danger` | `#dc2626` (red-600) | Delete, cancel, errors, cart badge |
+   359→| `warning` | `#eab308` (yellow-500) | Preparing, on-the-way status |
+   360→| `info` | `#2563eb` (blue-600) | Pending status, information |
+   361→| `dark` | `#1f2937` (gray-800) | Dark backgrounds, text |
+   362→| `darker` | `#111827` (gray-900) | Cart body, checkout panels |
+   363→| `heading` | `#1f2937` | Headings, bold text |
+   364→| `body` | `#4b5563` (gray-600) | Body text |
+   365→| `muted` | `#9ca3af` (gray-400) | Muted/secondary text |
+   366→| `background` | `#f9fafb` (gray-50) | Page background |
+   367→| `card` | `#ffffff` | Card backgrounds |
+   368→| `cart-bg` | `#1f2937` | Cart panel dark background |
+   369→| `cart-item` | `#374151` (gray-700) | Cart item row bg |
+   370→| `naira` | `#dc2626` (red-600) | ₦ currency symbol color |
+   371→
+   372→### Nigerian Naira (₦) Formatting
+   373→
+   374→```typescript
+   375→// Utility function for Nigerian Naira formatting
+   376→export function formatNaira(amount: number): string {
+   377→  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 0 })}`;
+   378→}
+   379→```
+   380→
+   381→### Typography
+   382→
+   383→| Font | Usage | Import |
+   384→|------|-------|--------|
+   385→| `Poppins` | Body text, UI elements | Google Fonts (300,400,500,600,700) |
+   386→| `Josefin Sans` | Headings, brand name | Google Fonts (400,600,700) |
+   387→| `Dancing Script` | Decorative accents (like "Give You Glory" in Methuen) | Google Fonts (400,700) |
+   388→
+   389→### Spacing & Sizing System
+   390→
+   391→| Token | Value | Usage |
+   392→|-------|-------|-------|
+   393→| `container-padding` | `1rem → 2rem → 3rem → 4rem` | Responsive container padding |
+   394→| `section-gap` | `3rem → 4rem` | Between page sections |
+   395→| `card-padding` | `1rem → 1.5rem` | Card internal padding |
+   396→| `card-radius` | `0.75rem` | Card border radius |
+   397→| `button-radius` | `0.5rem` / `9999px` (pill) | Button border radius |
+   398→| `food-card-width` | `280px → 320px` | Food item card min-width |
+   399→
+   400→### Responsive Breakpoints
+   401→
+   402→| Breakpoint | Value | Target |
+   403→|-----------|-------|--------|
+   404→| `sm` | 576px | Small phones landscape |
+   405→| `md` | 768px | Tablets |
+   406→| `lg` | 1024px | Small desktops |
+   407→| `xl` | 1280px | Desktops |
+   408→| `2xl` | 1536px | Large desktops |
+   409→
+   410→---
+   411→
+   412→## 7. Authentication Design
+   413→
+   414→### Registration Flow
+   415→1. User fills form: Full Name, Email, Phone, Password (min 8 chars), Confirm Password, Delivery Address
+   416→2. Server validates: required fields, email uniqueness, password match, password strength
+   417→3. Password hashed with bcrypt (12 salt rounds)
+   418→4. User created with role=CUSTOMER, status=ACTIVE
+   419→5. Auto-login after registration (redirect to home)
+   420→6. **NO email verification** (as specified)
+   421→7. **NO social login** (as specified)
+   422→
+   423→### Login Flow
+   424→1. User enters Email + Password
+   425→2. NextAuth Credentials provider validates
+   426→3. bcrypt password comparison
+   427→4. JWT token created (30-day expiry)
+   428→5. Redirect to home with auth state
+   429→
+   430→### Session Management
+   431→- JWT strategy (no database sessions)
+   432→- Token contains: userId, email, name, role
+   433→- Client-side: `useSession()` hook from NextAuth
+   434→- Admin check: `session.user.role === 'ADMIN'`
+   435→
+   436→### Default Admin Account
+   437→- Email: `admin@naijabites.ng`
+   438→- Password: `admin123` (to be changed on first login)
+   439→- Seeded via Prisma seed script
+   440→
+   441→---
+   442→
+   443→## 8. Paystack Integration Design
+   444→
+   445→### Payment Flow
+   446→```
+   447→User clicks "Pay Now"
+   448→  → POST /api/paystack/initialize
+   449→    → Create order in DB (status: PENDING, paymentStatus: PENDING)
+   450→    → Call Paystack API to initialize transaction
+   451→    → Return authorization_url
+   452→  → Client redirects to Paystack checkout page
+   453→    → User pays via Card/Bank Transfer/USSD
+   454→  → Paystack redirects to callback URL
+   455→    → GET /api/paystack/verify?reference=xxx
+   456→    → Verify transaction with Paystack API
+   457→    → Update order: paymentStatus: PAID, status: CONFIRMED
+   458→    → Redirect user to order confirmation
+   459→  → Paystack webhook (backup)
+   460→    → POST /api/paystack/webhook
+   461→    → Verify webhook signature
+   462→    → Update order payment status
+   463→```
+   464→
+   465→### Environment Variables (Paystack)
+   466→```
+   467→PAYSTACK_SECRET_KEY=sk_test_xxxxx  # User will add test key
+   468→PAYSTACK_PUBLIC_KEY=pk_test_xxxxx  # User will add test key
+   469→NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_xxxxx
+   470→PAYSTACK_WEBHOOK_SECRET=xxxxx
+   471→```
+   472→
+   473→### Supported Payment Methods (via Paystack)
+   474→- Debit/Credit Card (Visa, Mastercard, Verve)
+   475→- Bank Transfer
+   476→- USSD
+   477→- Mobile Money
+   478→
+   479→### COD (Cash on Delivery)
+   480→- Alternative payment option
+   481→- Order created with paymentMethod: COD, paymentStatus: PENDING
+   482→- Admin can manually mark as PAID after delivery
+   483→
+   484→---
+   485→
+   486→## 9. File Upload Design
+   487→
+   488→### Image Upload Strategy
+   489→- **Storage:** Local filesystem (`public/uploads/`)
+   490→- **Naming:** `{timestamp}-{randomString}.{ext}`
+   491→- **Accepted formats:** jpg, jpeg, png, webp
+   492→- **Max size:** 2MB
+   493→- **Endpoint:** `POST /api/upload` (admin only)
+   494→- **Returns:** Relative URL path `/uploads/filename.jpg`
+   495→
+   496→### Upload Flow
+   497→1. Admin selects file in form
+   498→2. Client-side validation (type, size)
+   499→3. POST to `/api/upload` with FormData
+   500→4. Server validates, generates unique filename
+   501→5. Saves to `public/uploads/`
+   502→6. Returns URL path
+   503→7. URL stored in database field
+   504→
+   505→---
+   506→
+   507→## 10. Key Architecture Decisions
+   508→
+   509→### Decision 1: Single Route vs Multi-Route
+   510→**Choice:** Single route (`/`) with client-side navigation  
+   511→**Reason:** Project constraint — only `/` route is visible to users  
+   512→**Implementation:** Zustand store manages `activeSection` state, components conditionally rendered
+   513→
+   514→### Decision 2: HeroUI v2 vs shadcn/ui
+   515→**Choice:** HeroUI v2 (as specified by user)  
+   516→**Reason:** User explicitly requested HeroUI v2  
+   517→**Impact:** Replace all shadcn/ui component imports with HeroUI equivalents
+   518→
+   519→### Decision 3: PostgreSQL vs SQLite
+   520→**Choice:** PostgreSQL (as specified by user)  
+   521→**Reason:** User explicitly requested PostgreSQL, better for production  
+   522→**Impact:** Prisma schema uses PostgreSQL provider
+   523→
+   524→### Decision 4: Order Grouping
+   525→**Choice:** Orders are grouped entities with multiple items (NOT one-item-per-order like Methuen)  
+   526→**Reason:** Methuen's design of one row per dish is a critical flaw  
+   527→**Implementation:** Order → OrderItem relationship, single order with multiple items
+   528→
+   529→### Decision 5: Paystack vs Stripe
+   530→**Choice:** Paystack (Nigerian payment gateway)  
+   531→**Reason:** Nigerian project, NGN currency, local payment methods (USSD, Verve)  
+   532→**Impact:** Different API integration than Stripe
+   533→
+   534→### Decision 6: No Email Verification / No Social Login
+   535→**Choice:** Skip both as specified  
+   536→**Reason:** Student project, simplify onboarding  
+   537→**Impact:** Simpler auth flow, but need CAPTCHA or rate limiting to prevent spam
+   538→
+   539→### Decision 7: Client-Side Cart
+   540→**Choice:** Zustand + localStorage persistence  
+   541→**Reason:** Performance (no server round-trip for cart operations), works offline  
+   542→**Risk:** Cart items could become stale if food prices change  
+   543→**Mitigation:** Verify prices server-side during checkout
+   544→
+   545→---
+   546→
+   547→## 11. Project Folder Structure
+   548→
+   549→```
+   550→src/
+   551→├── app/
+   552→│   ├── layout.tsx                    # Root layout with providers
+   553→│   ├── page.tsx                      # Main page (single route)
+   554→│   ├── globals.css                   # Global styles + Tailwind
+   555→│   ├── api/
+   556→│   │   ├── auth/
+   557→│   │   │   ├── register/route.ts     # User registration
+   558→│   │   │   └── [...nextauth]/route.ts # NextAuth handler
+   559→│   │   ├── categories/route.ts       # Category CRUD
+   560→│   │   ├── restaurants/route.ts      # Restaurant CRUD
+   561→│   │   ├── foods/route.ts            # Food CRUD + filtering
+   562→│   │   ├── orders/route.ts           # Order CRUD
+   563→│   │   ├── users/route.ts            # User management
+   564→│   │   ├── profile/route.ts          # Profile CRUD
+   565→│   │   ├── upload/route.ts           # Image upload
+   566→│   │   ├── paystack/
+   567→│   │   │   ├── initialize/route.ts   # Initialize payment
+   568→│   │   │   ├── verify/route.ts       # Verify payment
+   569→│   │   │   └── webhook/route.ts      # Paystack webhook
+   570→│   │   └── dashboard/
+   571→│   │       ├── stats/route.ts        # Dashboard statistics
+   572→│   │       └── earnings/route.ts     # Earnings data
+   573→│   └── favicon.ico
+   574→├── components/
+   575→│   ├── layout/
+   576→│   │   ├── Header.tsx                # Fixed top navigation
+   577→│   │   ├── Footer.tsx                # Sticky bottom footer
+   578→│   │   ├── HeroSlider.tsx            # Homepage hero carousel
+   579→│   │   └── SectionHeader.tsx         # Reusable section title
+   580→│   ├── home/
+   581→│   │   ├── HeroSection.tsx           # Hero with search
+   582→│   │   ├── PopularFoods.tsx          # Popular dishes grid
+   583→│   │   ├── FeaturedRestaurants.tsx   # Restaurant cards
+   584→│   │   ├── HowItWorks.tsx            # 3-step process
+   585→│   │   └── CTASection.tsx            # Call to action
+   586→│   ├── restaurants/
+   587→│   │   ├── RestaurantCard.tsx        # Single restaurant card
+   588→│   │   ├── RestaurantList.tsx        # Grid of restaurants
+   589→│   │   └── RestaurantFilter.tsx      # Category filter buttons
+   590→│   ├── foods/
+   591→│   │   ├── FoodCard.tsx              # Single food item card
+   592→│   │   ├── FoodGrid.tsx              # Grid of food items
+   593→│   │   ├── FoodFilter.tsx            # Category/restaurant filter
+   594→│   │   └── FoodDetailModal.tsx       # Food detail popup
+   595→│   ├── cart/
+   596→│   │   ├── CartPanel.tsx             # Slide-in cart overlay
+   597→│   │   ├── CartItem.tsx              # Single cart item row
+   598→│   │   └── CartSummary.tsx           # Cart totals section
+   599→│   ├── checkout/
+   600→│   │   ├── CheckoutPanel.tsx         # Slide-in checkout overlay
+   601→│   │   ├── DeliveryForm.tsx          # Address & phone form
+   602→│   │   ├── PaymentSelector.tsx       # Paystack/COD selector
+   603→│   │   └── OrderSummary.tsx          # Order total breakdown
+   604→│   ├── orders/
+   605→│   │   ├── OrdersList.tsx            # User's orders table
+   606→│   │   ├── OrderCard.tsx             # Single order card
+   607→│   │   └── OrderDetail.tsx           # Order detail view
+   608→│   ├── profile/
+   609→│   │   ├── ProfileForm.tsx           # Edit profile form
+   610→│   │   └── ProfileAvatar.tsx         # Avatar upload
+   611→│   ├── auth/
+   612→│   │   ├── LoginForm.tsx             # Login form
+   613→│   │   └── RegisterForm.tsx          # Registration form
+   614→│   ├── admin/
+   615→│   │   ├── AdminLayout.tsx           # Admin panel layout
+   616→│   │   ├── AdminDashboard.tsx        # Stats cards + charts
+   617→│   │   ├── AdminRestaurants.tsx      # Restaurant CRUD
+   618→│   │   ├── AdminCategories.tsx       # Category CRUD
+   619→│   │   ├── AdminMenuItems.tsx        # Food menu CRUD
+   620→│   │   ├── AdminOrders.tsx           # Order management
+   621→│   │   ├── AdminCustomers.tsx        # Customer management
+   622→│   │   ├── AdminEarnings.tsx         # Earnings view
+   623→│   │   ├── AdminSidebar.tsx          # Admin navigation
+   624→│   │   └── AdminTable.tsx            # Reusable data table
+   625→│   └── ui/                           # HeroUI v2 components (auto-generated)
+   626→├── hooks/
+   627→│   ├── useAuth.ts                    # Auth state hook
+   628→│   ├── useCart.ts                    # Cart state hook
+   629→│   ├── useNavigation.ts              # Section navigation hook
+   630→│   └── useProfile.ts                 # Profile data hook
+   631→├── stores/
+   632→│   ├── cart-store.ts                 # Zustand cart store
+   633→│   ├── navigation-store.ts           # Zustand navigation store
+   634→│   └── ui-store.ts                   # Zustand UI state store
+   635→├── lib/
+   636→│   ├── db.ts                         # Prisma client singleton
+   637→│   ├── paystack.ts                   # Paystack SDK wrapper
+   638→│   ├── auth.ts                       # NextAuth configuration
+   639→│   ├── utils.ts                      # Utility functions
+   640→│   └── validators.ts                 # Input validation schemas
+   641→├── types/
+   642→│   ├── index.ts                      # Shared TypeScript types
+   643→│   └── api.ts                        # API request/response types
+   644→├── constants/
+   645→│   │   └── index.ts                  # App constants
+   646→│   └── data/
+   647→│       └── seed-data.ts              # Database seed data
+   648→prisma/
+   649→├── schema.prisma                     # Database schema
+   650→└── seed.ts                           # Seed script
+   651→public/
+   652→├── uploads/                          # Uploaded images
+   653→├── images/                           # Static images
+   654→│   ├── hero/                         # Hero slider images
+   655→│   ├── food/                         # Default food images
+   656→│   ├── restaurants/                  # Default restaurant images
+   657→│   └── icons/                        # Custom icons
+   658→└── favicon.ico
+   659→```
+   660→
+   661→---
+   662→
+   663→## 12. Agentic Prompt for Implementation
+   664→
+   665→### Phase 1: Foundation Setup
+   666→```
+   667→Set up the Next.js 16 project with:
+   668→1. Install HeroUI v2, Zustand, TanStack Query, Framer Motion, react-hot-toast, bcryptjs, paystack
+   669→2. Configure Tailwind CSS 4 with custom NaijaBites theme (orange primary, Nigerian context)
+   670→3. Set up Prisma with PostgreSQL schema (all models as defined above)
+   671→4. Run db:push to create tables
+   672→5. Create seed script with default admin, sample categories, restaurants, foods
+   673→6. Configure NextAuth.js v4 with Credentials provider only
+   674→7. Set up folder structure as defined
+   675→8. Create utility functions (formatNaira, generateOrderNumber, etc.)
+   676→9. Create TypeScript type definitions
+   677→10. Create Zustand stores (cart, navigation, UI)
+   678→```
+   679→
+   680→### Phase 2: Layout & Navigation
+   681→```
+   682→Build the application shell:
+   683→1. Root layout with HeroUI Provider, TanStack Query Provider, Session Provider, Toaster
+   684→2. Header component with: Logo, navigation tabs (Home, Restaurants, Menu, Orders), user dropdown, cart badge
+   685→3. Footer component (sticky to bottom)
+   686→4. Navigation store managing active section
+   687→5. Section-based rendering in page.tsx
+   688→6. Auth modals (login/register as overlays)
+   689→7. Cart panel (slide-in from right)
+   690→8. Admin mode toggle (switches to admin layout)
+   691→```
+   692→
+   693→### Phase 3: Client-Side Features
+   694→```
+   695→Build all customer-facing features:
+   696→1. Home section with hero, popular foods, featured restaurants, how-it-works
+   697→2. Restaurants section with category filter, grid of restaurant cards
+   698→3. Menu section with food cards, category/restaurant filters, add-to-cart
+   699→4. Cart panel with items, quantity controls, remove, totals, checkout button
+   700→5. Checkout panel with delivery form, payment selector (Paystack/COD), order summary
+   701→6. Orders section with order list, status badges, order detail
+   702→7. Profile section with edit form, avatar upload
+   703→8. Food detail modal
+   704→```
+   705→
+   706→### Phase 4: API Routes
+   707→```
+   708→Build all backend API routes:
+   709→1. Auth routes (register, NextAuth handler)
+   710→2. Category CRUD routes
+   711→3. Restaurant CRUD routes
+   712→4. Food CRUD routes with filtering (by category, restaurant, search)
+   713→5. Order routes (create, list, update status, cancel)
+   714→6. User management routes (admin)
+   715→7. Profile routes
+   716→8. Image upload route
+   717→9. Paystack integration (initialize, verify, webhook)
+   718→10. Dashboard stats and earnings routes
+   719→```
+   720→
+   721→### Phase 5: Admin Panel
+   722→```
+   723→Build the admin panel:
+   724→1. Admin layout with sidebar navigation
+   725→2. Dashboard with stat cards and charts
+   726→3. Restaurant management (CRUD table + forms)
+   727→4. Category management (CRUD table + forms)
+   728→5. Food menu management (CRUD table + forms with image upload)
+   729→6. Order management (table with status update, detail view, remarks)
+   730→7. Customer management (user list, edit, block/unblock)
+   731→8. Earnings view (total revenue, breakdown by period, charts)
+   732→```
+   733→
+   734→### Phase 6: Integration & Polish
+   735→```
+   736→Final integration and polish:
+   737→1. Paystack test integration end-to-end
+   738→2. Price verification during checkout (server-side)
+   739→3. Loading states and error handling on all components
+   740→4. Toast notifications for all user actions
+   741→5. Responsive design testing (mobile, tablet, desktop)
+   742→6. Framer Motion animations (page transitions, hover effects, slide-ins)
+   743→7. Empty states for all lists
+   744→8. Form validation (client + server side)
+   745→9. Image optimization with Next.js Image component
+   746→10. Final testing and bug fixes
+   747→```
+   748→

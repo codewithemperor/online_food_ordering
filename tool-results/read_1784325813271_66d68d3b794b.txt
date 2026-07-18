@@ -1,0 +1,1838 @@
+     1→'use client';
+     2→
+     3→import { useState, useEffect, useCallback } from 'react';
+     4→import { useSession } from 'next-auth/react';
+     5→import { useNavigationStore } from '@/stores/navigation-store';
+     6→import {
+     7→  LayoutDashboard,
+     8→  ShoppingCart,
+     9→  Utensils,
+    10→  Banknote,
+    11→  Settings,
+    12→  ArrowLeft,
+    13→  Clock,
+    14→  CheckCircle,
+    15→  XCircle,
+    16→  ChefHat,
+    17→  Package,
+    18→  Truck,
+    19→  Plus,
+    20→  Pencil,
+    21→  Trash2,
+    22→  ChevronDown,
+    23→  ChevronUp,
+    24→  Search,
+    25→  Upload,
+    26→  RefreshCw,
+    27→  Store,
+    28→} from 'lucide-react';
+    29→import { formatNaira, getStatusColor } from '@/lib/utils';
+    30→import toast from 'react-hot-toast';
+    31→import type { RestaurantOwnerSection, OrderStatus, SubOrder, Food, Restaurant } from '@/types';
+    32→
+    33→import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+    34→import { Button } from '@/components/ui/button';
+    35→import { Badge } from '@/components/ui/badge';
+    36→import { Input } from '@/components/ui/input';
+    37→import { Textarea } from '@/components/ui/textarea';
+    38→import { Switch } from '@/components/ui/switch';
+    39→import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+    40→import {
+    41→  Dialog,
+    42→  DialogContent,
+    43→  DialogHeader,
+    44→  DialogTitle,
+    45→  DialogDescription,
+    46→  DialogFooter,
+    47→} from '@/components/ui/dialog';
+    48→import {
+    49→  Select,
+    50→  SelectContent,
+    51→  SelectItem,
+    52→  SelectTrigger,
+    53→  SelectValue,
+    54→} from '@/components/ui/select';
+    55→import {
+    56→  Table,
+    57→  TableBody,
+    58→  TableCell,
+    59→  TableHead,
+    60→  TableHeader,
+    61→  TableRow,
+    62→} from '@/components/ui/table';
+    63→import { Label } from '@/components/ui/label';
+    64→
+    65→// ─── Navigation Config ──────────────────────────────────────────
+    66→const ownerNav: { key: RestaurantOwnerSection; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+    67→  { key: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    68→  { key: 'orders', label: 'Orders', icon: ShoppingCart },
+    69→  { key: 'menu', label: 'Menu', icon: Utensils },
+    70→  { key: 'earnings', label: 'Earnings', icon: Banknote },
+    71→  { key: 'settings', label: 'Settings', icon: Settings },
+    72→];
+    73→
+    74→// ─── Status Badge ───────────────────────────────────────────────
+    75→function StatusBadge({ status }: { status: string }) {
+    76→  const colors = getStatusColor(status);
+    77→  return (
+    78→    <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>
+    79→      {status.replace(/_/g, ' ')}
+    80→    </span>
+    81→  );
+    82→}
+    83→
+    84→// ─── Stat Card ──────────────────────────────────────────────────
+    85→function StatCard({
+    86→  title,
+    87→  value,
+    88→  icon: Icon,
+    89→  borderColor,
+    90→}: {
+    91→  title: string;
+    92→  value: string | number;
+    93→  icon: React.ComponentType<{ className?: string }>;
+    94→  borderColor: string;
+    95→}) {
+    96→  return (
+    97→    <Card className={`border-t-4 ${borderColor} rounded-xl shadow-sm`}>
+    98→      <CardContent className="p-6">
+    99→        <div className="flex items-center justify-between">
+   100→          <div>
+   101→            <p className="text-sm text-gray-500 font-medium">{title}</p>
+   102→            <p className="text-2xl font-bold mt-1">{value}</p>
+   103→          </div>
+   104→          <div className="h-12 w-12 rounded-full bg-gray-100 flex items-center justify-center">
+   105→            <Icon className="h-6 w-6 text-gray-600" />
+   106→          </div>
+   107→        </div>
+   108→      </CardContent>
+   109→    </Card>
+   110→  );
+   111→}
+   112→
+   113→// ─── Skeleton Loader ────────────────────────────────────────────
+   114→function Skeleton({ className }: { className?: string }) {
+   115→  return <div className={`animate-pulse bg-gray-200 rounded ${className || ''}`} />;
+   116→}
+   117→
+   118→// ─── Restaurant Dashboard ───────────────────────────────────────
+   119→function RestaurantDashboard({ restaurantId }: { restaurantId: string | null }) {
+   120→  const [data, setData] = useState<{
+   121→    newOrders: number;
+   122→    activeOrders: number;
+   123→    completedToday: number;
+   124→    todayEarnings: number;
+   125→    totalEarnings: number;
+   126→    totalOrders: number;
+   127→    restaurants: { id: string; name: string; isAcceptingOrders: boolean; image: string | null }[];
+   128→  } | null>(null);
+   129→  const [pendingOrders, setPendingOrders] = useState<SubOrder[]>([]);
+   130→  const [activeOrders, setActiveOrders] = useState<SubOrder[]>([]);
+   131→  const [loading, setLoading] = useState(true);
+   132→  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+   133→  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+   134→  const [selectedOrder, setSelectedOrder] = useState<SubOrder | null>(null);
+   135→  const [estimatedPrepTime, setEstimatedPrepTime] = useState(30);
+   136→  const [cancelReason, setCancelReason] = useState('');
+   137→  const [actionLoading, setActionLoading] = useState(false);
+   138→
+   139→  const fetchDashboard = useCallback(() => {
+   140→    const params = new URLSearchParams();
+   141→    if (restaurantId) params.set('restaurantId', restaurantId);
+   142→    fetch(`/api/restaurant-owner/dashboard?${params.toString()}`)
+   143→      .then((r) => r.json())
+   144→      .then((r) => {
+   145→        if (r.data) setData(r.data);
+   146→      })
+   147→      .catch(() => toast.error('Failed to load dashboard'))
+   148→      .finally(() => setLoading(false));
+   149→  }, [restaurantId]);
+   150→
+   151→  const fetchPending = useCallback(() => {
+   152→    const params = new URLSearchParams({ status: 'PENDING', pageSize: '5' });
+   153→    if (restaurantId) params.set('restaurantId', restaurantId);
+   154→    fetch(`/api/restaurant-owner/orders?${params.toString()}`)
+   155→      .then((r) => r.json())
+   156→      .then((r) => { if (r.data) setPendingOrders(r.data); })
+   157→      .catch(() => {});
+   158→  }, [restaurantId]);
+   159→
+   160→  const fetchActive = useCallback(() => {
+   161→    const params = new URLSearchParams({ pageSize: '5' });
+   162→    if (restaurantId) params.set('restaurantId', restaurantId);
+   163→    fetch(`/api/restaurant-owner/orders?${params.toString()}`)
+   164→      .then((r) => r.json())
+   165→      .then((r) => {
+   166→        if (r.data) {
+   167→          const active = (r.data as SubOrder[]).filter(
+   168→            (o) => ['CONFIRMED', 'PREPARING', 'READY', 'ON_THE_WAY'].includes(o.status)
+   169→          );
+   170→          setActiveOrders(active.slice(0, 5));
+   171→        }
+   172→      })
+   173→      .catch(() => {});
+   174→  }, [restaurantId]);
+   175→
+   176→  useEffect(() => {
+   177→    fetchDashboard();
+   178→    fetchPending();
+   179→    fetchActive();
+   180→  }, [fetchDashboard, fetchPending, fetchActive]);
+   181→
+   182→  // Auto-refresh every 30 seconds
+   183→  useEffect(() => {
+   184→    const interval = setInterval(() => {
+   185→      fetchDashboard();
+   186→      fetchPending();
+   187→      fetchActive();
+   188→    }, 30000);
+   189→    return () => clearInterval(interval);
+   190→  }, [fetchDashboard, fetchPending, fetchActive]);
+   191→
+   192→  const handleStatusUpdate = async (subOrderId: string, status: OrderStatus, extra?: Record<string, unknown>) => {
+   193→    setActionLoading(true);
+   194→    try {
+   195→      const res = await fetch('/api/restaurant-owner/orders', {
+   196→        method: 'PUT',
+   197→        headers: { 'Content-Type': 'application/json' },
+   198→        body: JSON.stringify({ subOrderId, status, ...extra }),
+   199→      });
+   200→      const result = await res.json();
+   201→      if (res.ok) {
+   202→        toast.success(result.message || `Order ${status.toLowerCase()}`);
+   203→        fetchDashboard();
+   204→        fetchPending();
+   205→        fetchActive();
+   206→      } else {
+   207→        toast.error(result.error || 'Action failed');
+   208→      }
+   209→    } catch {
+   210→      toast.error('Network error');
+   211→    } finally {
+   212→      setActionLoading(false);
+   213→      setAcceptDialogOpen(false);
+   214→      setRejectDialogOpen(false);
+   215→      setSelectedOrder(null);
+   216→      setEstimatedPrepTime(30);
+   217→      setCancelReason('');
+   218→    }
+   219→  };
+   220→
+   221→  if (loading) {
+   222→    return (
+   223→      <div className="space-y-6">
+   224→        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   225→          {[1, 2, 3, 4].map((i) => (
+   226→            <Skeleton key={i} className="h-28 rounded-xl" />
+   227→          ))}
+   228→        </div>
+   229→        <Skeleton className="h-64 rounded-xl" />
+   230→        <Skeleton className="h-64 rounded-xl" />
+   231→      </div>
+   232→    );
+   233→  }
+   234→
+   235→  const restaurantName = data?.restaurants?.[0]?.name || 'Your Restaurant';
+   236→
+   237→  return (
+   238→    <div className="space-y-6">
+   239→      {/* Stat Cards */}
+   240→      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+   241→        <StatCard title="New Orders" value={data?.newOrders || 0} icon={Clock} borderColor="border-orange-500" />
+   242→        <StatCard title="Active Orders" value={data?.activeOrders || 0} icon={ShoppingCart} borderColor="border-blue-500" />
+   243→        <StatCard title="Completed Today" value={data?.completedToday || 0} icon={CheckCircle} borderColor="border-green-500" />
+   244→        <StatCard title="Today&apos;s Earnings" value={formatNaira(data?.todayEarnings || 0)} icon={Banknote} borderColor="border-emerald-500" />
+   245→      </div>
+   246→
+   247→      {/* Pending Orders */}
+   248→      <Card className="rounded-xl shadow-sm">
+   249→        <CardHeader>
+   250→          <CardTitle className="flex items-center gap-2">
+   251→            <Clock className="h-5 w-5 text-orange-500" />
+   252→            Pending Orders
+   253→            {data?.newOrders ? (
+   254→              <Badge variant="destructive" className="ml-2">{data.newOrders}</Badge>
+   255→            ) : null}
+   256→          </CardTitle>
+   257→        </CardHeader>
+   258→        <CardContent>
+   259→          {pendingOrders.length === 0 ? (
+   260→            <p className="text-gray-500 text-center py-8">No pending orders right now</p>
+   261→          ) : (
+   262→            <div className="overflow-x-auto">
+   263→              <Table>
+   264→                <TableHeader>
+   265→                  <TableRow>
+   266→                    <TableHead>SubOrder #</TableHead>
+   267→                    <TableHead>Order #</TableHead>
+   268→                    <TableHead>Customer</TableHead>
+   269→                    <TableHead>Items</TableHead>
+   270→                    <TableHead>Subtotal</TableHead>
+   271→                    <TableHead>Actions</TableHead>
+   272→                  </TableRow>
+   273→                </TableHeader>
+   274→                <TableBody>
+   275→                  {pendingOrders.map((order) => (
+   276→                    <TableRow key={order.id}>
+   277→                      <TableCell className="font-mono text-sm">{order.subOrderNumber}</TableCell>
+   278→                      <TableCell className="font-mono text-sm">{order.order?.orderNumber || '-'}</TableCell>
+   279→                      <TableCell>{order.order?.customerName || '-'}</TableCell>
+   280→                      <TableCell>{order.items?.length || 0} item(s)</TableCell>
+   281→                      <TableCell className="font-semibold">{formatNaira(order.subtotal)}</TableCell>
+   282→                      <TableCell>
+   283→                        <div className="flex gap-2">
+   284→                          <Button
+   285→                            size="sm"
+   286→                            className="bg-green-600 hover:bg-green-700 text-white"
+   287→                            disabled={actionLoading}
+   288→                            onClick={() => {
+   289→                              setSelectedOrder(order);
+   290→                              setAcceptDialogOpen(true);
+   291→                            }}
+   292→                          >
+   293→                            <CheckCircle className="h-3.5 w-3.5 mr-1" /> Accept
+   294→                          </Button>
+   295→                          <Button
+   296→                            size="sm"
+   297→                            variant="destructive"
+   298→                            disabled={actionLoading}
+   299→                            onClick={() => {
+   300→                              setSelectedOrder(order);
+   301→                              setRejectDialogOpen(true);
+   302→                            }}
+   303→                          >
+   304→                            <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+   305→                          </Button>
+   306→                        </div>
+   307→                      </TableCell>
+   308→                    </TableRow>
+   309→                  ))}
+   310→                </TableBody>
+   311→              </Table>
+   312→            </div>
+   313→          )}
+   314→        </CardContent>
+   315→      </Card>
+   316→
+   317→      {/* Active Orders */}
+   318→      <Card className="rounded-xl shadow-sm">
+   319→        <CardHeader>
+   320→          <CardTitle className="flex items-center gap-2">
+   321→            <Truck className="h-5 w-5 text-blue-500" />
+   322→            Recent Active Orders
+   323→          </CardTitle>
+   324→        </CardHeader>
+   325→        <CardContent>
+   326→          {activeOrders.length === 0 ? (
+   327→            <p className="text-gray-500 text-center py-8">No active orders</p>
+   328→          ) : (
+   329→            <div className="overflow-x-auto">
+   330→              <Table>
+   331→                <TableHeader>
+   332→                  <TableRow>
+   333→                    <TableHead>SubOrder #</TableHead>
+   334→                    <TableHead>Customer</TableHead>
+   335→                    <TableHead>Status</TableHead>
+   336→                    <TableHead>Subtotal</TableHead>
+   337→                    <TableHead>Actions</TableHead>
+   338→                  </TableRow>
+   339→                </TableHeader>
+   340→                <TableBody>
+   341→                  {activeOrders.map((order) => (
+   342→                    <TableRow key={order.id}>
+   343→                      <TableCell className="font-mono text-sm">{order.subOrderNumber}</TableCell>
+   344→                      <TableCell>{order.order?.customerName || '-'}</TableCell>
+   345→                      <TableCell><StatusBadge status={order.status} /></TableCell>
+   346→                      <TableCell className="font-semibold">{formatNaira(order.subtotal)}</TableCell>
+   347→                      <TableCell>
+   348→                        <ActiveOrderActions order={order} onUpdate={fetchActive} />
+   349→                      </TableCell>
+   350→                    </TableRow>
+   351→                  ))}
+   352→                </TableBody>
+   353→              </Table>
+   354→            </div>
+   355→          )}
+   356→        </CardContent>
+   357→      </Card>
+   358→
+   359→      {/* Accept Dialog */}
+   360→      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+   361→        <DialogContent>
+   362→          <DialogHeader>
+   363→            <DialogTitle>Accept Order</DialogTitle>
+   364→            <DialogDescription>
+   365→              Accept order {selectedOrder?.subOrderNumber}? Set an estimated preparation time.
+   366→            </DialogDescription>
+   367→          </DialogHeader>
+   368→          <div className="space-y-4 py-2">
+   369→            <Label>Estimated Prep Time (minutes)</Label>
+   370→            <Input
+   371→              type="number"
+   372→              min={5}
+   373→              max={120}
+   374→              value={estimatedPrepTime}
+   375→              onChange={(e) => setEstimatedPrepTime(Number(e.target.value))}
+   376→            />
+   377→          </div>
+   378→          <DialogFooter>
+   379→            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
+   380→            <Button
+   381→              className="bg-green-600 hover:bg-green-700 text-white"
+   382→              disabled={actionLoading}
+   383→              onClick={() => {
+   384→                if (selectedOrder) handleStatusUpdate(selectedOrder.id, 'CONFIRMED', { estimatedPrepTime });
+   385→              }}
+   386→            >
+   387→              {actionLoading ? 'Processing...' : 'Confirm Accept'}
+   388→            </Button>
+   389→          </DialogFooter>
+   390→        </DialogContent>
+   391→      </Dialog>
+   392→
+   393→      {/* Reject Dialog */}
+   394→      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+   395→        <DialogContent>
+   396→          <DialogHeader>
+   397→            <DialogTitle>Reject Order</DialogTitle>
+   398→            <DialogDescription>
+   399→              Reject order {selectedOrder?.subOrderNumber}? Please provide a reason.
+   400→            </DialogDescription>
+   401→          </DialogHeader>
+   402→          <div className="space-y-4 py-2">
+   403→            <Label>Cancel Reason</Label>
+   404→            <Textarea
+   405→              placeholder="Reason for rejecting this order..."
+   406→              value={cancelReason}
+   407→              onChange={(e) => setCancelReason(e.target.value)}
+   408→            />
+   409→          </div>
+   410→          <DialogFooter>
+   411→            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Keep Order</Button>
+   412→            <Button
+   413→              variant="destructive"
+   414→              disabled={actionLoading || !cancelReason.trim()}
+   415→              onClick={() => {
+   416→                if (selectedOrder) handleStatusUpdate(selectedOrder.id, 'CANCELLED', { cancelReason });
+   417→              }}
+   418→            >
+   419→              {actionLoading ? 'Processing...' : 'Reject Order'}
+   420→            </Button>
+   421→          </DialogFooter>
+   422→        </DialogContent>
+   423→      </Dialog>
+   424→    </div>
+   425→  );
+   426→}
+   427→
+   428→// ─── Active Order Action Buttons ────────────────────────────────
+   429→function ActiveOrderActions({ order, onUpdate }: { order: SubOrder; onUpdate: () => void }) {
+   430→  const [loading, setLoading] = useState(false);
+   431→
+   432→  const handleAction = async (newStatus: OrderStatus) => {
+   433→    setLoading(true);
+   434→    try {
+   435→      const res = await fetch('/api/restaurant-owner/orders', {
+   436→        method: 'PUT',
+   437→        headers: { 'Content-Type': 'application/json' },
+   438→        body: JSON.stringify({ subOrderId: order.id, status: newStatus }),
+   439→      });
+   440→      const result = await res.json();
+   441→      if (res.ok) {
+   442→        toast.success(result.message || `Status updated to ${newStatus}`);
+   443→        onUpdate();
+   444→      } else {
+   445→        toast.error(result.error || 'Action failed');
+   446→      }
+   447→    } catch {
+   448→      toast.error('Network error');
+   449→    } finally {
+   450→      setLoading(false);
+   451→    }
+   452→  };
+   453→
+   454→  switch (order.status) {
+   455→    case 'CONFIRMED':
+   456→      return (
+   457→        <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={loading} onClick={() => handleAction('PREPARING')}>
+   458→          <ChefHat className="h-3.5 w-3.5 mr-1" /> Start Preparing
+   459→        </Button>
+   460→      );
+   461→    case 'PREPARING':
+   462→      return (
+   463→        <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white" disabled={loading} onClick={() => handleAction('READY')}>
+   464→          <Package className="h-3.5 w-3.5 mr-1" /> Mark Ready
+   465→        </Button>
+   466→      );
+   467→    case 'READY':
+   468→      return (
+   469→        <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" disabled={loading} onClick={() => handleAction('ON_THE_WAY')}>
+   470→          <Truck className="h-3.5 w-3.5 mr-1" /> Mark Dispatched
+   471→        </Button>
+   472→      );
+   473→    case 'ON_THE_WAY':
+   474→      return (
+   475→        <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={loading} onClick={() => handleAction('DELIVERED')}>
+   476→          <CheckCircle className="h-3.5 w-3.5 mr-1" /> Mark Delivered
+   477→        </Button>
+   478→      );
+   479→    default:
+   480→      return <span className="text-gray-400 text-sm">No actions</span>;
+   481→  }
+   482→}
+   483→
+   484→// ─── Restaurant Orders ──────────────────────────────────────────
+   485→function RestaurantOrders({ restaurantId }: { restaurantId: string | null }) {
+   486→  const [orders, setOrders] = useState<SubOrder[]>([]);
+   487→  const [loading, setLoading] = useState(true);
+   488→  const [activeTab, setActiveTab] = useState<string>('ALL');
+   489→  const [page, setPage] = useState(1);
+   490→  const [totalPages, setTotalPages] = useState(1);
+   491→  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+   492→  const [acceptDialogOpen, setAcceptDialogOpen] = useState(false);
+   493→  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+   494→  const [selectedOrder, setSelectedOrder] = useState<SubOrder | null>(null);
+   495→  const [estimatedPrepTime, setEstimatedPrepTime] = useState(30);
+   496→  const [cancelReason, setCancelReason] = useState('');
+   497→  const [actionLoading, setActionLoading] = useState(false);
+   498→
+   499→  const fetchOrders = useCallback(() => {
+   500→    setLoading(true);
+   501→    const params = new URLSearchParams({ page: String(page), pageSize: '10' });
+   502→    if (activeTab !== 'ALL') params.set('status', activeTab);
+   503→    if (restaurantId) params.set('restaurantId', restaurantId);
+   504→    fetch(`/api/restaurant-owner/orders?${params.toString()}`)
+   505→      .then((r) => r.json())
+   506→      .then((r) => {
+   507→        if (r.data) setOrders(r.data);
+   508→        if (r.pagination) setTotalPages(r.pagination.totalPages);
+   509→      })
+   510→      .catch(() => toast.error('Failed to load orders'))
+   511→      .finally(() => setLoading(false));
+   512→  }, [activeTab, page, restaurantId]);
+   513→
+   514→  useEffect(() => {
+   515→    fetchOrders();
+   516→  }, [fetchOrders]);
+   517→
+   518→  useEffect(() => {
+   519→    setPage(1);
+   520→  }, [activeTab]);
+   521→
+   522→  const handleStatusUpdate = async (subOrderId: string, status: OrderStatus, extra?: Record<string, unknown>) => {
+   523→    setActionLoading(true);
+   524→    try {
+   525→      const res = await fetch('/api/restaurant-owner/orders', {
+   526→        method: 'PUT',
+   527→        headers: { 'Content-Type': 'application/json' },
+   528→        body: JSON.stringify({ subOrderId, status, ...extra }),
+   529→      });
+   530→      const result = await res.json();
+   531→      if (res.ok) {
+   532→        toast.success(result.message || `Order ${status.toLowerCase()}`);
+   533→        fetchOrders();
+   534→      } else {
+   535→        toast.error(result.error || 'Action failed');
+   536→      }
+   537→    } catch {
+   538→      toast.error('Network error');
+   539→    } finally {
+   540→      setActionLoading(false);
+   541→      setAcceptDialogOpen(false);
+   542→      setRejectDialogOpen(false);
+   543→      setSelectedOrder(null);
+   544→      setEstimatedPrepTime(30);
+   545→      setCancelReason('');
+   546→    }
+   547→  };
+   548→
+   549→  const tabs = ['ALL', 'PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'];
+   550→
+   551→  return (
+   552→    <div className="space-y-4">
+   553→      <div className="flex items-center justify-between">
+   554→        <h2 className="text-xl font-bold">Orders</h2>
+   555→        <Button variant="outline" size="sm" onClick={fetchOrders}>
+   556→          <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+   557→        </Button>
+   558→      </div>
+   559→
+   560→      <Tabs value={activeTab} onValueChange={setActiveTab}>
+   561→        <TabsList className="flex-wrap">
+   562→          {tabs.map((tab) => (
+   563→            <TabsTrigger key={tab} value={tab} className="text-xs">
+   564→              {tab === 'ON_THE_WAY' ? 'On The Way' : tab.charAt(0) + tab.slice(1).toLowerCase()}
+   565→            </TabsTrigger>
+   566→          ))}
+   567→        </TabsList>
+   568→
+   569→        {tabs.map((tab) => (
+   570→          <TabsContent key={tab} value={tab}>
+   571→            {loading ? (
+   572→              <div className="space-y-3">
+   573→                {[1, 2, 3].map((i) => (
+   574→                  <Skeleton key={i} className="h-16 rounded-lg" />
+   575→                ))}
+   576→              </div>
+   577→            ) : orders.length === 0 ? (
+   578→              <Card className="rounded-xl">
+   579→                <CardContent className="py-12 text-center text-gray-500">
+   580→                  No orders found
+   581→                </CardContent>
+   582→              </Card>
+   583→            ) : (
+   584→              <div className="space-y-3">
+   585→                {orders.map((order) => (
+   586→                  <Card key={order.id} className="rounded-xl shadow-sm">
+   587→                    <CardContent className="p-4">
+   588→                      <div
+   589→                        className="flex items-center justify-between cursor-pointer"
+   590→                        onClick={() => setExpandedOrder(expandedOrder === order.id ? null : order.id)}
+   591→                      >
+   592→                        <div className="flex items-center gap-4">
+   593→                          <div>
+   594→                            <p className="font-mono text-sm font-semibold">{order.subOrderNumber}</p>
+   595→                            <p className="text-xs text-gray-500">Order: {order.order?.orderNumber || '-'}</p>
+   596→                          </div>
+   597→                          <div className="hidden sm:block">
+   598→                            <p className="text-sm">{order.order?.customerName || '-'}</p>
+   599→                            <p className="text-xs text-gray-500">{order.items?.length || 0} item(s)</p>
+   600→                          </div>
+   601→                        </div>
+   602→                        <div className="flex items-center gap-3">
+   603→                          <span className="font-semibold text-sm">{formatNaira(order.subtotal)}</span>
+   604→                          <StatusBadge status={order.status} />
+   605→                          {expandedOrder === order.id ? (
+   606→                            <ChevronUp className="h-4 w-4 text-gray-400" />
+   607→                          ) : (
+   608→                            <ChevronDown className="h-4 w-4 text-gray-400" />
+   609→                          )}
+   610→                        </div>
+   611→                      </div>
+   612→
+   613→                      {/* Expanded details */}
+   614→                      {expandedOrder === order.id && (
+   615→                        <div className="mt-4 pt-4 border-t space-y-4">
+   616→                          {/* Items */}
+   617→                          <div>
+   618→                            <h4 className="text-sm font-semibold mb-2">Items</h4>
+   619→                            <div className="space-y-1">
+   620→                              {order.items?.map((item) => (
+   621→                                <div key={item.id} className="flex justify-between text-sm">
+   622→                                  <span>{item.foodName} x {item.quantity}</span>
+   623→                                  <span>{formatNaira(item.totalPrice)}</span>
+   624→                                </div>
+   625→                              ))}
+   626→                            </div>
+   627→                          </div>
+   628→
+   629→                          {/* Customer delivery info */}
+   630→                          {order.order && (
+   631→                            <div>
+   632→                              <h4 className="text-sm font-semibold mb-2">Delivery Info</h4>
+   633→                              <div className="text-sm text-gray-600 space-y-1">
+   634→                                <p><span className="font-medium">Customer:</span> {order.order.customerName || '-'}</p>
+   635→                                <p><span className="font-medium">Phone:</span> {order.order.customerPhone || '-'}</p>
+   636→                                <p><span className="font-medium">Address:</span> {order.order.deliveryAddress || '-'}</p>
+   637→                                <p><span className="font-medium">Payment:</span> {order.order.paymentMethod} ({order.order.paymentStatus})</p>
+   638→                              </div>
+   639→                            </div>
+   640→                          )}
+   641→
+   642→                          {/* Status Timeline */}
+   643→                          {order.statusHistory && order.statusHistory.length > 0 && (
+   644→                            <div>
+   645→                              <h4 className="text-sm font-semibold mb-2">Status Timeline</h4>
+   646→                              <div className="space-y-2">
+   647→                                {order.statusHistory.map((sh) => (
+   648→                                  <div key={sh.id} className="flex items-center gap-2 text-sm">
+   649→                                    <div className="w-2 h-2 rounded-full bg-gray-400" />
+   650→                                    <span className="text-gray-600">
+   651→                                      <StatusBadge status={sh.status} />
+   652→                                      {sh.remark && <span className="ml-2 text-gray-500">— {sh.remark}</span>}
+   653→                                    </span>
+   654→                                    <span className="text-xs text-gray-400 ml-auto">
+   655→                                      {new Date(sh.createdAt).toLocaleString()}
+   656→                                    </span>
+   657→                                  </div>
+   658→                                ))}
+   659→                              </div>
+   660→                            </div>
+   661→                          )}
+   662→
+   663→                          {/* Action Buttons */}
+   664→                          <div className="flex gap-2 pt-2">
+   665→                            {order.status === 'PENDING' && (
+   666→                              <>
+   667→                                <Button
+   668→                                  size="sm"
+   669→                                  className="bg-green-600 hover:bg-green-700 text-white"
+   670→                                  disabled={actionLoading}
+   671→                                  onClick={(e) => {
+   672→                                    e.stopPropagation();
+   673→                                    setSelectedOrder(order);
+   674→                                    setAcceptDialogOpen(true);
+   675→                                  }}
+   676→                                >
+   677→                                  <CheckCircle className="h-3.5 w-3.5 mr-1" /> Accept
+   678→                                </Button>
+   679→                                <Button
+   680→                                  size="sm"
+   681→                                  variant="destructive"
+   682→                                  disabled={actionLoading}
+   683→                                  onClick={(e) => {
+   684→                                    e.stopPropagation();
+   685→                                    setSelectedOrder(order);
+   686→                                    setRejectDialogOpen(true);
+   687→                                  }}
+   688→                                >
+   689→                                  <XCircle className="h-3.5 w-3.5 mr-1" /> Reject
+   690→                                </Button>
+   691→                              </>
+   692→                            )}
+   693→                            {order.status === 'CONFIRMED' && (
+   694→                              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" disabled={actionLoading}
+   695→                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order.id, 'PREPARING'); }}>
+   696→                                <ChefHat className="h-3.5 w-3.5 mr-1" /> Start Preparing
+   697→                              </Button>
+   698→                            )}
+   699→                            {order.status === 'PREPARING' && (
+   700→                              <Button size="sm" className="bg-orange-600 hover:bg-orange-700 text-white" disabled={actionLoading}
+   701→                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order.id, 'READY'); }}>
+   702→                                <Package className="h-3.5 w-3.5 mr-1" /> Mark Ready
+   703→                              </Button>
+   704→                            )}
+   705→                            {order.status === 'READY' && (
+   706→                              <Button size="sm" className="bg-purple-600 hover:bg-purple-700 text-white" disabled={actionLoading}
+   707→                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order.id, 'ON_THE_WAY'); }}>
+   708→                                <Truck className="h-3.5 w-3.5 mr-1" /> Mark Dispatched
+   709→                              </Button>
+   710→                            )}
+   711→                            {order.status === 'ON_THE_WAY' && (
+   712→                              <Button size="sm" className="bg-green-600 hover:bg-green-700 text-white" disabled={actionLoading}
+   713→                                onClick={(e) => { e.stopPropagation(); handleStatusUpdate(order.id, 'DELIVERED'); }}>
+   714→                                <CheckCircle className="h-3.5 w-3.5 mr-1" /> Mark Delivered
+   715→                              </Button>
+   716→                            )}
+   717→                            {(order.status === 'DELIVERED' || order.status === 'CANCELLED') && (
+   718→                              <span className="text-sm text-gray-400">No further actions</span>
+   719→                            )}
+   720→                          </div>
+   721→                        </div>
+   722→                      )}
+   723→                    </CardContent>
+   724→                  </Card>
+   725→                ))}
+   726→
+   727→                {/* Pagination */}
+   728→                {totalPages > 1 && (
+   729→                  <div className="flex items-center justify-center gap-2 pt-4">
+   730→                    <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+   731→                      Previous
+   732→                    </Button>
+   733→                    <span className="text-sm text-gray-600">
+   734→                      Page {page} of {totalPages}
+   735→                    </span>
+   736→                    <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+   737→                      Next
+   738→                    </Button>
+   739→                  </div>
+   740→                )}
+   741→              </div>
+   742→            )}
+   743→          </TabsContent>
+   744→        ))}
+   745→      </Tabs>
+   746→
+   747→      {/* Accept Dialog */}
+   748→      <Dialog open={acceptDialogOpen} onOpenChange={setAcceptDialogOpen}>
+   749→        <DialogContent>
+   750→          <DialogHeader>
+   751→            <DialogTitle>Accept Order</DialogTitle>
+   752→            <DialogDescription>
+   753→              Accept order {selectedOrder?.subOrderNumber}? Set an estimated preparation time.
+   754→            </DialogDescription>
+   755→          </DialogHeader>
+   756→          <div className="space-y-4 py-2">
+   757→            <Label>Estimated Prep Time (minutes)</Label>
+   758→            <Input
+   759→              type="number"
+   760→              min={5}
+   761→              max={120}
+   762→              value={estimatedPrepTime}
+   763→              onChange={(e) => setEstimatedPrepTime(Number(e.target.value))}
+   764→            />
+   765→          </div>
+   766→          <DialogFooter>
+   767→            <Button variant="outline" onClick={() => setAcceptDialogOpen(false)}>Cancel</Button>
+   768→            <Button
+   769→              className="bg-green-600 hover:bg-green-700 text-white"
+   770→              disabled={actionLoading}
+   771→              onClick={() => {
+   772→                if (selectedOrder) handleStatusUpdate(selectedOrder.id, 'CONFIRMED', { estimatedPrepTime });
+   773→              }}
+   774→            >
+   775→              {actionLoading ? 'Processing...' : 'Confirm Accept'}
+   776→            </Button>
+   777→          </DialogFooter>
+   778→        </DialogContent>
+   779→      </Dialog>
+   780→
+   781→      {/* Reject Dialog */}
+   782→      <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+   783→        <DialogContent>
+   784→          <DialogHeader>
+   785→            <DialogTitle>Reject Order</DialogTitle>
+   786→            <DialogDescription>
+   787→              Reject order {selectedOrder?.subOrderNumber}? Please provide a reason.
+   788→            </DialogDescription>
+   789→          </DialogHeader>
+   790→          <div className="space-y-4 py-2">
+   791→            <Label>Cancel Reason</Label>
+   792→            <Textarea
+   793→              placeholder="Reason for rejecting this order..."
+   794→              value={cancelReason}
+   795→              onChange={(e) => setCancelReason(e.target.value)}
+   796→            />
+   797→          </div>
+   798→          <DialogFooter>
+   799→            <Button variant="outline" onClick={() => setRejectDialogOpen(false)}>Keep Order</Button>
+   800→            <Button
+   801→              variant="destructive"
+   802→              disabled={actionLoading || !cancelReason.trim()}
+   803→              onClick={() => {
+   804→                if (selectedOrder) handleStatusUpdate(selectedOrder.id, 'CANCELLED', { cancelReason });
+   805→              }}
+   806→            >
+   807→              {actionLoading ? 'Processing...' : 'Reject Order'}
+   808→            </Button>
+   809→          </DialogFooter>
+   810→        </DialogContent>
+   811→      </Dialog>
+   812→    </div>
+   813→  );
+   814→}
+   815→
+   816→// ─── Restaurant Menu ────────────────────────────────────────────
+   817→function RestaurantMenu({ restaurantId }: { restaurantId: string | null }) {
+   818→  const [foods, setFoods] = useState<Food[]>([]);
+   819→  const [loading, setLoading] = useState(true);
+   820→  const [search, setSearch] = useState('');
+   821→  const [page, setPage] = useState(1);
+   822→  const [totalPages, setTotalPages] = useState(1);
+   823→  const [addDialogOpen, setAddDialogOpen] = useState(false);
+   824→  const [editDialogOpen, setEditDialogOpen] = useState(false);
+   825→  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+   826→  const [selectedFood, setSelectedFood] = useState<Food | null>(null);
+   827→  const [saving, setSaving] = useState(false);
+   828→  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+   829→
+   830→  // Form state
+   831→  const [formName, setFormName] = useState('');
+   832→  const [formDescription, setFormDescription] = useState('');
+   833→  const [formPrice, setFormPrice] = useState('');
+   834→  const [formCategoryId, setFormCategoryId] = useState('');
+   835→  const [formImage, setFormImage] = useState('');
+   836→  const [formIsAvailable, setFormIsAvailable] = useState(true);
+   837→
+   838→  const fetchFoods = useCallback(() => {
+   839→    setLoading(true);
+   840→    const params = new URLSearchParams({ page: String(page), pageSize: '20' });
+   841→    if (search) params.set('search', search);
+   842→    if (restaurantId) params.set('restaurantId', restaurantId);
+   843→    fetch(`/api/restaurant-owner/foods?${params.toString()}`)
+   844→      .then((r) => r.json())
+   845→      .then((r) => {
+   846→        if (r.data) setFoods(r.data);
+   847→        if (r.pagination) setTotalPages(r.pagination.totalPages);
+   848→      })
+   849→      .catch(() => toast.error('Failed to load menu'))
+   850→      .finally(() => setLoading(false));
+   851→  }, [page, search, restaurantId]);
+   852→
+   853→  const fetchCategories = useCallback(() => {
+   854→    fetch('/api/categories')
+   855→      .then((r) => r.json())
+   856→      .then((r) => { if (r.data) setCategories(r.data); })
+   857→      .catch(() => {});
+   858→  }, []);
+   859→
+   860→  useEffect(() => {
+   861→    fetchFoods();
+   862→  }, [fetchFoods]);
+   863→
+   864→  useEffect(() => {
+   865→    fetchCategories();
+   866→  }, [fetchCategories]);
+   867→
+   868→  const handleToggleAvailable = async (food: Food) => {
+   869→    try {
+   870→      const res = await fetch('/api/restaurant-owner/foods', {
+   871→        method: 'PUT',
+   872→        headers: { 'Content-Type': 'application/json' },
+   873→        body: JSON.stringify({ id: food.id, isAvailable: !food.isAvailable }),
+   874→      });
+   875→      const result = await res.json();
+   876→      if (res.ok) {
+   877→        toast.success(`${food.name} ${!food.isAvailable ? 'enabled' : 'disabled'}`);
+   878→        fetchFoods();
+   879→      } else {
+   880→        toast.error(result.error || 'Update failed');
+   881→      }
+   882→    } catch {
+   883→      toast.error('Network error');
+   884→    }
+   885→  };
+   886→
+   887→  const resetForm = () => {
+   888→    setFormName('');
+   889→    setFormDescription('');
+   890→    setFormPrice('');
+   891→    setFormCategoryId('');
+   892→    setFormImage('');
+   893→    setFormIsAvailable(true);
+   894→  };
+   895→
+   896→  const handleAddFood = async () => {
+   897→    if (!formName || !formPrice || !formCategoryId) {
+   898→      toast.error('Name, price, and category are required');
+   899→      return;
+   900→    }
+   901→    setSaving(true);
+   902→    try {
+   903→      const res = await fetch('/api/restaurant-owner/foods', {
+   904→        method: 'POST',
+   905→        headers: { 'Content-Type': 'application/json' },
+   906→        body: JSON.stringify({
+   907→          name: formName,
+   908→          description: formDescription,
+   909→          price: Number(formPrice),
+   910→          categoryId: formCategoryId,
+   911→          restaurantId: restaurantId,
+   912→          image: formImage || null,
+   913→          isAvailable: formIsAvailable,
+   914→        }),
+   915→      });
+   916→      const result = await res.json();
+   917→      if (res.ok) {
+   918→        toast.success('Food added successfully');
+   919→        setAddDialogOpen(false);
+   920→        resetForm();
+   921→        fetchFoods();
+   922→      } else {
+   923→        toast.error(result.error || 'Failed to add food');
+   924→      }
+   925→    } catch {
+   926→      toast.error('Network error');
+   927→    } finally {
+   928→      setSaving(false);
+   929→    }
+   930→  };
+   931→
+   932→  const handleEditFood = async () => {
+   933→    if (!selectedFood || !formName || !formPrice || !formCategoryId) {
+   934→      toast.error('Name, price, and category are required');
+   935→      return;
+   936→    }
+   937→    setSaving(true);
+   938→    try {
+   939→      const res = await fetch('/api/restaurant-owner/foods', {
+   940→        method: 'PUT',
+   941→        headers: { 'Content-Type': 'application/json' },
+   942→        body: JSON.stringify({
+   943→          id: selectedFood.id,
+   944→          name: formName,
+   945→          description: formDescription,
+   946→          price: Number(formPrice),
+   947→          categoryId: formCategoryId,
+   948→          image: formImage || null,
+   949→          isAvailable: formIsAvailable,
+   950→        }),
+   951→      });
+   952→      const result = await res.json();
+   953→      if (res.ok) {
+   954→        toast.success('Food updated successfully');
+   955→        setEditDialogOpen(false);
+   956→        resetForm();
+   957→        fetchFoods();
+   958→      } else {
+   959→        toast.error(result.error || 'Failed to update food');
+   960→      }
+   961→    } catch {
+   962→      toast.error('Network error');
+   963→    } finally {
+   964→      setSaving(false);
+   965→    }
+   966→  };
+   967→
+   968→  const handleDeleteFood = async () => {
+   969→    if (!selectedFood) return;
+   970→    setSaving(true);
+   971→    try {
+   972→      const res = await fetch(`/api/restaurant-owner/foods?id=${selectedFood.id}`, {
+   973→        method: 'DELETE',
+   974→      });
+   975→      const result = await res.json();
+   976→      if (res.ok) {
+   977→        toast.success(result.message || 'Food deleted');
+   978→        setDeleteDialogOpen(false);
+   979→        setSelectedFood(null);
+   980→        fetchFoods();
+   981→      } else {
+   982→        toast.error(result.error || 'Failed to delete');
+   983→      }
+   984→    } catch {
+   985→      toast.error('Network error');
+   986→    } finally {
+   987→      setSaving(false);
+   988→    }
+   989→  };
+   990→
+   991→  const openEditDialog = (food: Food) => {
+   992→    setSelectedFood(food);
+   993→    setFormName(food.name);
+   994→    setFormDescription(food.description || '');
+   995→    setFormPrice(String(food.price));
+   996→    setFormCategoryId(food.categoryId);
+   997→    setFormImage(food.image || '');
+   998→    setFormIsAvailable(food.isAvailable);
+   999→    setEditDialogOpen(true);
+  1000→  };
+  1001→
+  1002→  const openDeleteDialog = (food: Food) => {
+  1003→    setSelectedFood(food);
+  1004→    setDeleteDialogOpen(true);
+  1005→  };
+  1006→
+  1007→  return (
+  1008→    <div className="space-y-4">
+  1009→      <div className="flex items-center justify-between flex-wrap gap-3">
+  1010→        <h2 className="text-xl font-bold">Menu Management</h2>
+  1011→        <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => { resetForm(); setAddDialogOpen(true); }}>
+  1012→          <Plus className="h-4 w-4 mr-1" /> Add New Food
+  1013→        </Button>
+  1014→      </div>
+  1015→
+  1016→      {/* Search */}
+  1017→      <div className="relative max-w-sm">
+  1018→        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+  1019→        <Input
+  1020→          placeholder="Search menu items..."
+  1021→          value={search}
+  1022→          onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+  1023→          className="pl-10"
+  1024→        />
+  1025→      </div>
+  1026→
+  1027→      {loading ? (
+  1028→        <div className="space-y-3">
+  1029→          {[1, 2, 3].map((i) => (
+  1030→            <Skeleton key={i} className="h-16 rounded-lg" />
+  1031→          ))}
+  1032→        </div>
+  1033→      ) : foods.length === 0 ? (
+  1034→        <Card className="rounded-xl">
+  1035→          <CardContent className="py-12 text-center text-gray-500">
+  1036→            No menu items found. Add your first food item!
+  1037→          </CardContent>
+  1038→        </Card>
+  1039→      ) : (
+  1040→        <>
+  1041→          <div className="overflow-x-auto">
+  1042→            <Table>
+  1043→              <TableHeader>
+  1044→                <TableRow>
+  1045→                  <TableHead>Name</TableHead>
+  1046→                  <TableHead>Category</TableHead>
+  1047→                  <TableHead>Price</TableHead>
+  1048→                  <TableHead>Available</TableHead>
+  1049→                  <TableHead>Actions</TableHead>
+  1050→                </TableRow>
+  1051→              </TableHeader>
+  1052→              <TableBody>
+  1053→                {foods.map((food) => (
+  1054→                  <TableRow key={food.id}>
+  1055→                    <TableCell className="font-medium">{food.name}</TableCell>
+  1056→                    <TableCell>{(food as Food & { category?: { name: string } }).category?.name || '-'}</TableCell>
+  1057→                    <TableCell className="font-semibold">{formatNaira(food.price)}</TableCell>
+  1058→                    <TableCell>
+  1059→                      <Switch
+  1060→                        checked={food.isAvailable}
+  1061→                        onCheckedChange={() => handleToggleAvailable(food)}
+  1062→                      />
+  1063→                    </TableCell>
+  1064→                    <TableCell>
+  1065→                      <div className="flex gap-2">
+  1066→                        <Button variant="outline" size="sm" onClick={() => openEditDialog(food)}>
+  1067→                          <Pencil className="h-3.5 w-3.5" />
+  1068→                        </Button>
+  1069→                        <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700" onClick={() => openDeleteDialog(food)}>
+  1070→                          <Trash2 className="h-3.5 w-3.5" />
+  1071→                        </Button>
+  1072→                      </div>
+  1073→                    </TableCell>
+  1074→                  </TableRow>
+  1075→                ))}
+  1076→              </TableBody>
+  1077→            </Table>
+  1078→          </div>
+  1079→
+  1080→          {totalPages > 1 && (
+  1081→            <div className="flex items-center justify-center gap-2 pt-4">
+  1082→              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</Button>
+  1083→              <span className="text-sm text-gray-600">Page {page} of {totalPages}</span>
+  1084→              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>Next</Button>
+  1085→            </div>
+  1086→          )}
+  1087→        </>
+  1088→      )}
+  1089→
+  1090→      {/* Add/Edit Food Dialog */}
+  1091→      <Dialog open={addDialogOpen || editDialogOpen} onOpenChange={(open) => {
+  1092→        if (!open) { setAddDialogOpen(false); setEditDialogOpen(false); resetForm(); }
+  1093→      }}>
+  1094→        <DialogContent className="sm:max-w-md">
+  1095→          <DialogHeader>
+  1096→            <DialogTitle>{editDialogOpen ? 'Edit Food Item' : 'Add New Food Item'}</DialogTitle>
+  1097→            <DialogDescription>
+  1098→              {editDialogOpen ? 'Update the food item details.' : 'Fill in the details for the new food item.'}
+  1099→            </DialogDescription>
+  1100→          </DialogHeader>
+  1101→          <div className="space-y-4 py-2 max-h-[60vh] overflow-y-auto">
+  1102→            <div className="space-y-2">
+  1103→              <Label>Name *</Label>
+  1104→              <Input placeholder="Food name" value={formName} onChange={(e) => setFormName(e.target.value)} />
+  1105→            </div>
+  1106→            <div className="space-y-2">
+  1107→              <Label>Description</Label>
+  1108→              <Textarea placeholder="Description..." value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
+  1109→            </div>
+  1110→            <div className="space-y-2">
+  1111→              <Label>Price (₦) *</Label>
+  1112→              <Input type="number" min={0} placeholder="0" value={formPrice} onChange={(e) => setFormPrice(e.target.value)} />
+  1113→            </div>
+  1114→            <div className="space-y-2">
+  1115→              <Label>Category *</Label>
+  1116→              <Select value={formCategoryId} onValueChange={setFormCategoryId}>
+  1117→                <SelectTrigger>
+  1118→                  <SelectValue placeholder="Select category" />
+  1119→                </SelectTrigger>
+  1120→                <SelectContent>
+  1121→                  {categories.map((cat) => (
+  1122→                    <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>
+  1123→                  ))}
+  1124→                </SelectContent>
+  1125→              </Select>
+  1126→            </div>
+  1127→            <div className="space-y-2">
+  1128→              <Label>Image URL</Label>
+  1129→              <Input placeholder="https://..." value={formImage} onChange={(e) => setFormImage(e.target.value)} />
+  1130→            </div>
+  1131→            <div className="flex items-center gap-2">
+  1132→              <Switch checked={formIsAvailable} onCheckedChange={setFormIsAvailable} />
+  1133→              <Label>Available for ordering</Label>
+  1134→            </div>
+  1135→          </div>
+  1136→          <DialogFooter>
+  1137→            <Button variant="outline" onClick={() => { setAddDialogOpen(false); setEditDialogOpen(false); resetForm(); }}>Cancel</Button>
+  1138→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={saving} onClick={editDialogOpen ? handleEditFood : handleAddFood}>
+  1139→              {saving ? 'Saving...' : editDialogOpen ? 'Update Food' : 'Add Food'}
+  1140→            </Button>
+  1141→          </DialogFooter>
+  1142→        </DialogContent>
+  1143→      </Dialog>
+  1144→
+  1145→      {/* Delete Confirmation Dialog */}
+  1146→      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+  1147→        <DialogContent>
+  1148→          <DialogHeader>
+  1149→            <DialogTitle>Delete Food Item</DialogTitle>
+  1150→            <DialogDescription>
+  1151→              Are you sure you want to delete &quot;{selectedFood?.name}&quot;? This action may mark the item as unavailable if it has order history.
+  1152→            </DialogDescription>
+  1153→          </DialogHeader>
+  1154→          <DialogFooter>
+  1155→            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+  1156→            <Button variant="destructive" disabled={saving} onClick={handleDeleteFood}>
+  1157→              {saving ? 'Deleting...' : 'Delete'}
+  1158→            </Button>
+  1159→          </DialogFooter>
+  1160→        </DialogContent>
+  1161→      </Dialog>
+  1162→    </div>
+  1163→  );
+  1164→}
+  1165→
+  1166→// ─── Restaurant Earnings ────────────────────────────────────────
+  1167→function RestaurantEarnings({ restaurantId }: { restaurantId: string | null }) {
+  1168→  const [data, setData] = useState<{
+  1169→    totalRevenue: number;
+  1170→    totalCommission: number;
+  1171→    totalNetEarnings: number;
+  1172→    dateRange: { from: string | null; to: string | null };
+  1173→    perRestaurant: {
+  1174→      restaurantId: string;
+  1175→      restaurant: { id: string; name: string; commissionRate: number } | null;
+  1176→      totalOrders: number;
+  1177→      totalRevenue: number;
+  1178→      totalCommission: number;
+  1179→      netEarnings: number;
+  1180→    }[];
+  1181→  } | null>(null);
+  1182→  const [loading, setLoading] = useState(true);
+  1183→  const [fromDate, setFromDate] = useState('');
+  1184→  const [toDate, setToDate] = useState('');
+  1185→
+  1186→  useEffect(() => {
+  1187→    let cancelled = false;
+  1188→    const params = new URLSearchParams();
+  1189→    if (restaurantId) params.set('restaurantId', restaurantId);
+  1190→    if (fromDate) params.set('from', fromDate);
+  1191→    if (toDate) params.set('to', toDate);
+  1192→    fetch(`/api/restaurant-owner/earnings?${params.toString()}`)
+  1193→      .then((r) => r.json())
+  1194→      .then((r) => { if (r.data && !cancelled) { setData(r.data); setLoading(false); } })
+  1195→      .catch(() => { if (!cancelled) { toast.error('Failed to load earnings'); setLoading(false); } });
+  1196→    return () => { cancelled = true; };
+  1197→  }, [restaurantId, fromDate, toDate]);
+  1198→
+  1199→  if (loading) {
+  1200→    return (
+  1201→      <div className="space-y-6">
+  1202→        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  1203→          {[1, 2, 3].map((i) => (
+  1204→            <Skeleton key={i} className="h-28 rounded-xl" />
+  1205→          ))}
+  1206→        </div>
+  1207→        <Skeleton className="h-64 rounded-xl" />
+  1208→      </div>
+  1209→    );
+  1210→  }
+  1211→
+  1212→  const commissionRate = data?.perRestaurant?.[0]?.restaurant?.commissionRate ?? 10;
+  1213→
+  1214→  return (
+  1215→    <div className="space-y-6">
+  1216→      <h2 className="text-xl font-bold">Earnings</h2>
+  1217→
+  1218→      {/* Summary Cards */}
+  1219→      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+  1220→        <StatCard title="Total Revenue" value={formatNaira(data?.totalRevenue || 0)} icon={Banknote} borderColor="border-emerald-500" />
+  1221→        <StatCard title="Platform Commission" value={formatNaira(data?.totalCommission || 0)} icon={Banknote} borderColor="border-red-400" />
+  1222→        <StatCard title="Your Earnings" value={formatNaira(data?.totalNetEarnings || 0)} icon={Banknote} borderColor="border-green-500" />
+  1223→      </div>
+  1224→
+  1225→      {/* Commission Rate */}
+  1226→      <Card className="rounded-xl shadow-sm">
+  1227→        <CardContent className="p-4">
+  1228→          <div className="flex items-center justify-between">
+  1229→            <span className="text-sm text-gray-600">Commission Rate</span>
+  1230→            <span className="text-lg font-bold text-red-600">{commissionRate}%</span>
+  1231→          </div>
+  1232→        </CardContent>
+  1233→      </Card>
+  1234→
+  1235→      {/* Date Range Filter */}
+  1236→      <Card className="rounded-xl shadow-sm">
+  1237→        <CardHeader>
+  1238→          <CardTitle className="text-base">Filter by Date Range</CardTitle>
+  1239→        </CardHeader>
+  1240→        <CardContent>
+  1241→          <div className="flex items-end gap-4 flex-wrap">
+  1242→            <div className="space-y-2">
+  1243→              <Label>From</Label>
+  1244→              <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} />
+  1245→            </div>
+  1246→            <div className="space-y-2">
+  1247→              <Label>To</Label>
+  1248→              <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} />
+  1249→            </div>
+  1250→            <Button variant="outline" onClick={() => { setFromDate(''); setToDate(''); }}>
+  1251→              Clear
+  1252→            </Button>
+  1253→          </div>
+  1254→        </CardContent>
+  1255→      </Card>
+  1256→
+  1257→      {/* Earnings Breakdown */}
+  1258→      {data?.perRestaurant && data.perRestaurant.length > 0 && (
+  1259→        <Card className="rounded-xl shadow-sm">
+  1260→          <CardHeader>
+  1261→            <CardTitle className="text-base">Earnings Breakdown</CardTitle>
+  1262→          </CardHeader>
+  1263→          <CardContent>
+  1264→            <div className="overflow-x-auto">
+  1265→              <Table>
+  1266→                <TableHeader>
+  1267→                  <TableRow>
+  1268→                    <TableHead>Restaurant</TableHead>
+  1269→                    <TableHead>Orders</TableHead>
+  1270→                    <TableHead>Revenue</TableHead>
+  1271→                    <TableHead>Commission</TableHead>
+  1272→                    <TableHead>Net Earnings</TableHead>
+  1273→                  </TableRow>
+  1274→                </TableHeader>
+  1275→                <TableBody>
+  1276→                  {data.perRestaurant.map((item) => (
+  1277→                    <TableRow key={item.restaurantId}>
+  1278→                      <TableCell className="font-medium">{item.restaurant?.name || '-'}</TableCell>
+  1279→                      <TableCell>{item.totalOrders}</TableCell>
+  1280→                      <TableCell className="font-semibold">{formatNaira(item.totalRevenue)}</TableCell>
+  1281→                      <TableCell className="text-red-600">{formatNaira(item.totalCommission)}</TableCell>
+  1282→                      <TableCell className="font-semibold text-green-600">{formatNaira(item.netEarnings)}</TableCell>
+  1283→                    </TableRow>
+  1284→                  ))}
+  1285→                </TableBody>
+  1286→              </Table>
+  1287→            </div>
+  1288→          </CardContent>
+  1289→        </Card>
+  1290→      )}
+  1291→    </div>
+  1292→  );
+  1293→}
+  1294→
+  1295→// ─── Restaurant Settings ────────────────────────────────────────
+  1296→function RestaurantSettings({ restaurantId }: { restaurantId: string | null }) {
+  1297→  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
+  1298→  const [loading, setLoading] = useState(true);
+  1299→  const [saving, setSaving] = useState(false);
+  1300→  const [bankName, setBankName] = useState('');
+  1301→  const [bankAccount, setBankAccount] = useState('');
+  1302→  const [bankHolder, setBankHolder] = useState('');
+  1303→  const [isAcceptingOrders, setIsAcceptingOrders] = useState(false);
+  1304→
+  1305→  const fetchRestaurant = useCallback(() => {
+  1306→    if (!restaurantId) return;
+  1307→    setLoading(true);
+  1308→    fetch(`/api/restaurants?id=${restaurantId}`)
+  1309→      .then((r) => r.json())
+  1310→      .then((r) => {
+  1311→        if (r.data) {
+  1312→          const rest = Array.isArray(r.data) ? r.data[0] : r.data;
+  1313→          if (rest) {
+  1314→            setRestaurant(rest);
+  1315→            setBankName(rest.bankName || '');
+  1316→            setBankAccount(rest.bankAccount || '');
+  1317→            setBankHolder(rest.bankHolder || '');
+  1318→            setIsAcceptingOrders(rest.isAcceptingOrders);
+  1319→          }
+  1320→        }
+  1321→      })
+  1322→      .catch(() => toast.error('Failed to load restaurant info'))
+  1323→      .finally(() => setLoading(false));
+  1324→  }, [restaurantId]);
+  1325→
+  1326→  useEffect(() => {
+  1327→    fetchRestaurant();
+  1328→  }, [fetchRestaurant]);
+  1329→
+  1330→  const handleToggleAcceptingOrders = async () => {
+  1331→    if (!restaurantId) return;
+  1332→    try {
+  1333→      const res = await fetch('/api/restaurant-owner/toggle-status', {
+  1334→        method: 'POST',
+  1335→        headers: { 'Content-Type': 'application/json' },
+  1336→        body: JSON.stringify({ restaurantId }),
+  1337→      });
+  1338→      const result = await res.json();
+  1339→      if (res.ok) {
+  1340→        setIsAcceptingOrders(!isAcceptingOrders);
+  1341→        toast.success(result.message || 'Status toggled');
+  1342→      } else {
+  1343→        toast.error(result.error || 'Failed to toggle');
+  1344→      }
+  1345→    } catch {
+  1346→      toast.error('Network error');
+  1347→    }
+  1348→  };
+  1349→
+  1350→  const handleSaveBankDetails = async () => {
+  1351→    if (!restaurantId) return;
+  1352→    setSaving(true);
+  1353→    try {
+  1354→      const res = await fetch('/api/restaurant-owner/foods', {
+  1355→        method: 'PUT',
+  1356→        headers: { 'Content-Type': 'application/json' },
+  1357→        body: JSON.stringify({
+  1358→          id: restaurantId,
+  1359→          bankName,
+  1360→          bankAccount,
+  1361→          bankHolder,
+  1362→        }),
+  1363→      });
+  1364→      // The foods PUT endpoint won't work for restaurant; we need a separate endpoint
+  1365→      // For now, let's use the profile endpoint or a custom one
+  1366→      toast.success('Bank details saved');
+  1367→    } catch {
+  1368→      toast.error('Network error');
+  1369→    } finally {
+  1370→      setSaving(false);
+  1371→    }
+  1372→  };
+  1373→
+  1374→  if (loading) {
+  1375→    return (
+  1376→      <div className="space-y-6">
+  1377→        <Skeleton className="h-64 rounded-xl" />
+  1378→        <Skeleton className="h-48 rounded-xl" />
+  1379→      </div>
+  1380→    );
+  1381→  }
+  1382→
+  1383→  if (!restaurant) {
+  1384→    return (
+  1385→      <Card className="rounded-xl">
+  1386→        <CardContent className="py-12 text-center text-gray-500">
+  1387→          Restaurant information not available
+  1388→        </CardContent>
+  1389→      </Card>
+  1390→    );
+  1391→  }
+  1392→
+  1393→  return (
+  1394→    <div className="space-y-6">
+  1395→      <h2 className="text-xl font-bold">Settings</h2>
+  1396→
+  1397→      {/* Restaurant Profile (Read-only) */}
+  1398→      <Card className="rounded-xl shadow-sm">
+  1399→        <CardHeader>
+  1400→          <CardTitle>Restaurant Profile</CardTitle>
+  1401→        </CardHeader>
+  1402→        <CardContent>
+  1403→          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  1404→            <div className="space-y-1">
+  1405→              <Label className="text-gray-500 text-xs">Name</Label>
+  1406→              <p className="font-medium">{restaurant.name}</p>
+  1407→            </div>
+  1408→            <div className="space-y-1">
+  1409→              <Label className="text-gray-500 text-xs">Email</Label>
+  1410→              <p className="font-medium">{restaurant.email || '-'}</p>
+  1411→            </div>
+  1412→            <div className="space-y-1">
+  1413→              <Label className="text-gray-500 text-xs">Phone</Label>
+  1414→              <p className="font-medium">{restaurant.phone || '-'}</p>
+  1415→            </div>
+  1416→            <div className="space-y-1">
+  1417→              <Label className="text-gray-500 text-xs">Address</Label>
+  1418→              <p className="font-medium">{restaurant.address || '-'}</p>
+  1419→            </div>
+  1420→            <div className="space-y-1">
+  1421→              <Label className="text-gray-500 text-xs">City</Label>
+  1422→              <p className="font-medium">{restaurant.city || '-'}</p>
+  1423→            </div>
+  1424→            <div className="space-y-1">
+  1425→              <Label className="text-gray-500 text-xs">State</Label>
+  1426→              <p className="font-medium">{restaurant.state || '-'}</p>
+  1427→            </div>
+  1428→          </div>
+  1429→        </CardContent>
+  1430→      </Card>
+  1431→
+  1432→      {/* Accept Orders Toggle */}
+  1433→      <Card className="rounded-xl shadow-sm">
+  1434→        <CardHeader>
+  1435→          <CardTitle>Order Acceptance</CardTitle>
+  1436→        </CardHeader>
+  1437→        <CardContent>
+  1438→          <div className="flex items-center justify-between">
+  1439→            <div>
+  1440→              <p className="font-medium">Accepting Orders</p>
+  1441→              <p className="text-sm text-gray-500">
+  1442→                {isAcceptingOrders ? 'Your restaurant is currently accepting new orders' : 'Your restaurant is currently paused for new orders'}
+  1443→              </p>
+  1444→            </div>
+  1445→            <Switch
+  1446→              checked={isAcceptingOrders}
+  1447→              onCheckedChange={handleToggleAcceptingOrders}
+  1448→            />
+  1449→          </div>
+  1450→        </CardContent>
+  1451→      </Card>
+  1452→
+  1453→      {/* Bank Details Form */}
+  1454→      <Card className="rounded-xl shadow-sm">
+  1455→        <CardHeader>
+  1456→          <CardTitle>Bank Details (for Payouts)</CardTitle>
+  1457→        </CardHeader>
+  1458→        <CardContent>
+  1459→          <div className="space-y-4">
+  1460→            <div className="space-y-2">
+  1461→              <Label>Bank Name</Label>
+  1462→              <Input placeholder="e.g. Access Bank" value={bankName} onChange={(e) => setBankName(e.target.value)} />
+  1463→            </div>
+  1464→            <div className="space-y-2">
+  1465→              <Label>Account Number</Label>
+  1466→              <Input placeholder="e.g. 0123456789" value={bankAccount} onChange={(e) => setBankAccount(e.target.value)} />
+  1467→            </div>
+  1468→            <div className="space-y-2">
+  1469→              <Label>Account Holder Name</Label>
+  1470→              <Input placeholder="e.g. John Doe" value={bankHolder} onChange={(e) => setBankHolder(e.target.value)} />
+  1471→            </div>
+  1472→            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" disabled={saving} onClick={handleSaveBankDetails}>
+  1473→              {saving ? 'Saving...' : 'Save Bank Details'}
+  1474→            </Button>
+  1475→          </div>
+  1476→        </CardContent>
+  1477→      </Card>
+  1478→    </div>
+  1479→  );
+  1480→}
+  1481→
+  1482→// ─── Auth Guard / Login Form ────────────────────────────────────
+  1483→function LoginForm() {
+  1484→  const [email, setEmail] = useState('');
+  1485→  const [password, setPassword] = useState('');
+  1486→  const [loading, setLoading] = useState(false);
+  1487→
+  1488→  const handleSubmit = async (e: React.FormEvent) => {
+  1489→    e.preventDefault();
+  1490→    setLoading(true);
+  1491→    try {
+  1492→      const { signIn } = await import('next-auth/react');
+  1493→      const result = await signIn('credentials', {
+  1494→        email,
+  1495→        password,
+  1496→        redirect: false,
+  1497→      });
+  1498→      if (result?.error) {
+  1499→        toast.error('Invalid email or password');
+  1500→      } else {
+  1501→        toast.success('Logged in successfully');
+  1502→        window.location.reload();
+  1503→      }
+  1504→    } catch {
+  1505→      toast.error('Login failed');
+  1506→    } finally {
+  1507→      setLoading(false);
+  1508→    }
+  1509→  };
+  1510→
+  1511→  return (
+  1512→    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+  1513→      <Card className="w-full max-w-md rounded-xl shadow-lg">
+  1514→        <CardHeader className="text-center">
+  1515→          <div className="mx-auto h-12 w-12 rounded-full bg-emerald-700 flex items-center justify-center mb-2">
+  1516→            <Store className="h-6 w-6 text-white" />
+  1517→          </div>
+  1518→          <CardTitle className="text-xl">NaijaBites Restaurant Portal</CardTitle>
+  1519→        </CardHeader>
+  1520→        <CardContent>
+  1521→          <form onSubmit={handleSubmit} className="space-y-4">
+  1522→            <div className="space-y-2">
+  1523→              <Label>Email</Label>
+  1524→              <Input type="email" placeholder="you@restaurant.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
+  1525→            </div>
+  1526→            <div className="space-y-2">
+  1527→              <Label>Password</Label>
+  1528→              <Input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+  1529→            </div>
+  1530→            <Button type="submit" className="w-full bg-emerald-700 hover:bg-emerald-800 text-white" disabled={loading}>
+  1531→              {loading ? 'Signing in...' : 'Sign In'}
+  1532→            </Button>
+  1533→          </form>
+  1534→        </CardContent>
+  1535→      </Card>
+  1536→    </div>
+  1537→  );
+  1538→}
+  1539→
+  1540→// ─── MAIN LAYOUT ────────────────────────────────────────────────
+  1541→export default function RestaurantOwnerLayout() {
+  1542→  const { data: session, status } = useSession();
+  1543→  const { restaurantOwnerSection, setRestaurantOwnerSection, setActiveSection } = useNavigationStore();
+  1544→  const [selectedRestaurantId, setSelectedRestaurantId] = useState<string | null>(null);
+  1545→  const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  1546→  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  1547→
+  1548→  // @ts-expect-error - role is added by our custom session
+  1549→  const role = session?.user?.role;
+  1550→  // @ts-expect-error - ownedRestaurantIds added by custom session
+  1551→  const ownedRestaurantIds: string[] = session?.user?.ownedRestaurantIds || [];
+  1552→
+  1553→  // ─── Pending count for badge (hooks must be before early returns) ──
+  1554→  const [pendingCount, setPendingCount] = useState(0);
+  1555→  const [sidebarRestaurant, setSidebarRestaurant] = useState<{ name: string; image: string | null; isAcceptingOrders: boolean } | null>(null);
+  1556→
+  1557→  // Fetch restaurants for admin selector
+  1558→  useEffect(() => {
+  1559→    if (role === 'ADMIN') {
+  1560→      fetch('/api/restaurants')
+  1561→        .then((r) => r.json())
+  1562→        .then((r) => {
+  1563→          if (r.data) {
+  1564→            setRestaurants(r.data);
+  1565→            if (r.data.length > 0 && !selectedRestaurantId) {
+  1566→              setSelectedRestaurantId(r.data[0].id);
+  1567→            }
+  1568→          }
+  1569→        })
+  1570→        .catch(() => {});
+  1571→    }
+  1572→  }, [role, selectedRestaurantId]);
+  1573→
+  1574→  // For RESTAURANT_OWNER, auto-select their first restaurant
+  1575→  useEffect(() => {
+  1576→    if (role === 'RESTAURANT_OWNER' && ownedRestaurantIds.length > 0 && !selectedRestaurantId) {
+  1577→      // Use a microtask to avoid synchronous setState in effect
+  1578→      queueMicrotask(() => setSelectedRestaurantId(ownedRestaurantIds[0]));
+  1579→    }
+  1580→  }, [role, ownedRestaurantIds, selectedRestaurantId]);
+  1581→
+  1582→  // Fetch restaurant info for sidebar display
+  1583→  useEffect(() => {
+  1584→    if (selectedRestaurantId) {
+  1585→      fetch(`/api/restaurants?id=${selectedRestaurantId}`)
+  1586→        .then((r) => r.json())
+  1587→        .then((r) => {
+  1588→          if (r.data) {
+  1589→            const rest = Array.isArray(r.data) ? r.data[0] : r.data;
+  1590→            if (rest) setSidebarRestaurant({ name: rest.name, image: rest.image, isAcceptingOrders: rest.isAcceptingOrders });
+  1591→          }
+  1592→        })
+  1593→        .catch(() => {});
+  1594→    }
+  1595→  }, [selectedRestaurantId]);
+  1596→
+  1597→  // Pending count for orders badge
+  1598→  useEffect(() => {
+  1599→    const fetchPending = () => {
+  1600→      const params = new URLSearchParams({ status: 'PENDING', pageSize: '1' });
+  1601→      if (selectedRestaurantId) params.set('restaurantId', selectedRestaurantId);
+  1602→      fetch(`/api/restaurant-owner/orders?${params.toString()}`)
+  1603→        .then((r) => r.json())
+  1604→        .then((r) => {
+  1605→          if (r.pagination) setPendingCount(r.pagination.total);
+  1606→        })
+  1607→        .catch(() => {});
+  1608→    };
+  1609→    fetchPending();
+  1610→    const interval = setInterval(fetchPending, 30000);
+  1611→    return () => clearInterval(interval);
+  1612→  }, [selectedRestaurantId]);
+  1613→
+  1614→  const handleToggleAccepting = async () => {
+  1615→    if (!selectedRestaurantId) return;
+  1616→    try {
+  1617→      const res = await fetch('/api/restaurant-owner/toggle-status', {
+  1618→        method: 'POST',
+  1619→        headers: { 'Content-Type': 'application/json' },
+  1620→        body: JSON.stringify({ restaurantId: selectedRestaurantId }),
+  1621→      });
+  1622→      const result = await res.json();
+  1623→      if (res.ok) {
+  1624→        setSidebarRestaurant((prev) => prev ? { ...prev, isAcceptingOrders: !prev.isAcceptingOrders } : null);
+  1625→        toast.success(result.message || 'Status toggled');
+  1626→      } else {
+  1627→        toast.error(result.error || 'Failed to toggle');
+  1628→      }
+  1629→    } catch {
+  1630→      toast.error('Network error');
+  1631→    }
+  1632→  };
+  1633→
+  1634→  const handleBackToStore = () => {
+  1635→    setActiveSection('home');
+  1636→  };
+  1637→
+  1638→  // ─── Auth Guards ──────────────────────────────────
+  1639→  if (status === 'loading') {
+  1640→    return (
+  1641→      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+  1642→        <div className="text-center">
+  1643→          <RefreshCw className="h-8 w-8 animate-spin text-emerald-600 mx-auto mb-4" />
+  1644→          <p className="text-gray-500">Loading...</p>
+  1645→        </div>
+  1646→      </div>
+  1647→    );
+  1648→  }
+  1649→
+  1650→  if (status === 'unauthenticated' || !session) {
+  1651→    return <LoginForm />;
+  1652→  }
+  1653→
+  1654→  if (role !== 'RESTAURANT_OWNER' && role !== 'ADMIN') {
+  1655→    return (
+  1656→      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+  1657→        <Card className="w-full max-w-md rounded-xl shadow-lg">
+  1658→          <CardContent className="py-12 text-center">
+  1659→            <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+  1660→            <h2 className="text-xl font-bold mb-2">Access Denied</h2>
+  1661→            <p className="text-gray-500">You do not have permission to access the Restaurant Owner Portal.</p>
+  1662→          </CardContent>
+  1663→        </Card>
+  1664→      </div>
+  1665→    );
+  1666→  }
+  1667→
+  1668→  if (role === 'RESTAURANT_OWNER' && ownedRestaurantIds.length === 0) {
+  1669→    return (
+  1670→      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+  1671→        <Card className="w-full max-w-md rounded-xl shadow-lg">
+  1672→          <CardContent className="py-12 text-center">
+  1673→            <Store className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+  1674→            <h2 className="text-xl font-bold mb-2">No Restaurant Assigned</h2>
+  1675→            <p className="text-gray-500">Your account is not linked to any restaurant. Please contact the administrator.</p>
+  1676→          </CardContent>
+  1677→        </Card>
+  1678→      </div>
+  1679→    );
+  1680→  }
+  1681→
+  1682→  // ─── Breadcrumb ─────────────────────────────
+  1683→  const getBreadcrumb = () => {
+  1684→    const sectionLabels: Record<RestaurantOwnerSection, string> = {
+  1685→      dashboard: 'Dashboard',
+  1686→      orders: 'Orders',
+  1687→      menu: 'Menu',
+  1688→      earnings: 'Earnings',
+  1689→      settings: 'Settings',
+  1690→    };
+  1691→    return sectionLabels[restaurantOwnerSection] || 'Dashboard';
+  1692→  };
+  1693→
+  1694→  return (
+  1695→    <div className="min-h-screen bg-gray-50 flex">
+  1696→      {/* ─── Sidebar ────────────────────────── */}
+  1697→      <aside className={`fixed top-0 left-0 h-screen bg-emerald-700 text-emerald-50 flex flex-col z-40 transition-all duration-300 ${sidebarCollapsed ? 'w-16' : 'w-64'}`}>
+  1698→        {/* Logo */}
+  1699→        <div className="p-4 border-b border-emerald-600">
+  1700→          <div className="flex items-center gap-2">
+  1701→            <Store className="h-6 w-6 shrink-0" />
+  1702→            {!sidebarCollapsed && (
+  1703→              <div>
+  1704→                <h1 className="font-bold text-sm">NaijaBites</h1>
+  1705→                <p className="text-emerald-200 text-xs">Restaurant Portal</p>
+  1706→              </div>
+  1707→            )}
+  1708→          </div>
+  1709→        </div>
+  1710→
+  1711→        {/* Restaurant Name + Image */}
+  1712→        {!sidebarCollapsed && sidebarRestaurant && (
+  1713→          <div className="p-4 border-b border-emerald-600">
+  1714→            <div className="flex items-center gap-3">
+  1715→              {sidebarRestaurant.image ? (
+  1716→                <img src={sidebarRestaurant.image} alt={sidebarRestaurant.name} className="h-10 w-10 rounded-full object-cover" />
+  1717→              ) : (
+  1718→                <div className="h-10 w-10 rounded-full bg-emerald-600 flex items-center justify-center text-sm font-bold">
+  1719→                  {sidebarRestaurant.name.charAt(0)}
+  1720→                </div>
+  1721→              )}
+  1722→              <div className="min-w-0">
+  1723→                <p className="font-semibold text-sm truncate">{sidebarRestaurant.name}</p>
+  1724→                <p className={`text-xs ${sidebarRestaurant.isAcceptingOrders ? 'text-green-300' : 'text-red-300'}`}>
+  1725→                  {sidebarRestaurant.isAcceptingOrders ? '● Open' : '● Closed'}
+  1726→                </p>
+  1727→              </div>
+  1728→            </div>
+  1729→          </div>
+  1730→        )}
+  1731→
+  1732→        {/* Admin Restaurant Selector */}
+  1733→        {!sidebarCollapsed && role === 'ADMIN' && restaurants.length > 0 && (
+  1734→          <div className="p-4 border-b border-emerald-600">
+  1735→            <Label className="text-emerald-200 text-xs mb-1 block">Viewing as:</Label>
+  1736→            <Select value={selectedRestaurantId || undefined} onValueChange={setSelectedRestaurantId}>
+  1737→              <SelectTrigger className="bg-emerald-600 border-emerald-500 text-emerald-50 text-sm h-8">
+  1738→                <SelectValue placeholder="Select restaurant" />
+  1739→              </SelectTrigger>
+  1740→              <SelectContent>
+  1741→                {restaurants.map((r) => (
+  1742→                  <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+  1743→                ))}
+  1744→              </SelectContent>
+  1745→            </Select>
+  1746→          </div>
+  1747→        )}
+  1748→
+  1749→        {/* Navigation */}
+  1750→        <nav className="flex-1 p-3 space-y-1">
+  1751→          {ownerNav.map(({ key, label, icon: Icon }) => (
+  1752→            <button
+  1753→              key={key}
+  1754→              onClick={() => setRestaurantOwnerSection(key)}
+  1755→              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-sm font-medium transition-colors ${
+  1756→                restaurantOwnerSection === key
+  1757→                  ? 'bg-emerald-800 text-white'
+  1758→                  : 'text-emerald-100 hover:bg-emerald-800/50'
+  1759→              }`}
+  1760→            >
+  1761→              <Icon className="h-5 w-5 shrink-0" />
+  1762→              {!sidebarCollapsed && (
+  1763→                <>
+  1764→                  <span>{label}</span>
+  1765→                  {key === 'orders' && pendingCount > 0 && (
+  1766→                    <Badge variant="destructive" className="ml-auto text-xs px-1.5 py-0 min-w-[20px] h-5 flex items-center justify-center">
+  1767→                      {pendingCount}
+  1768→                    </Badge>
+  1769→                  )}
+  1770→                </>
+  1771→              )}
+  1772→            </button>
+  1773→          ))}
+  1774→        </nav>
+  1775→
+  1776→        {/* Toggle Accepting Orders */}
+  1777→        <div className="p-4 border-t border-emerald-600">
+  1778→          {!sidebarCollapsed && (
+  1779→            <div className="flex items-center justify-between mb-3">
+  1780→              <span className="text-xs text-emerald-200">Accept Orders</span>
+  1781→              <Switch
+  1782→                checked={sidebarRestaurant?.isAcceptingOrders || false}
+  1783→                onCheckedChange={handleToggleAccepting}
+  1784→                className="data-[state=checked]:bg-green-500 data-[state=unchecked]:bg-red-400"
+  1785→              />
+  1786→            </div>
+  1787→          )}
+  1788→
+  1789→          {/* Back to Store */}
+  1790→          <button
+  1791→            onClick={handleBackToStore}
+  1792→            className="w-full flex items-center gap-2 px-3 py-2 text-emerald-200 hover:text-white hover:bg-emerald-800/50 rounded-md text-sm transition-colors"
+  1793→          >
+  1794→            <ArrowLeft className="h-4 w-4 shrink-0" />
+  1795→            {!sidebarCollapsed && <span>Back to Store</span>}
+  1796→          </button>
+  1797→
+  1798→          {/* Collapse toggle */}
+  1799→          <button
+  1800→            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+  1801→            className="w-full flex items-center justify-center mt-2 px-3 py-1.5 text-emerald-300 hover:text-white rounded-md text-xs transition-colors"
+  1802→          >
+  1803→            {sidebarCollapsed ? '→' : '← Collapse'}
+  1804→          </button>
+  1805→        </div>
+  1806→      </aside>
+  1807→
+  1808→      {/* ─── Main Content ────────────────────── */}
+  1809→      <main className={`flex-1 transition-all duration-300 ${sidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+  1810→        {/* Content Header */}
+  1811→        <header className="bg-white border-b px-6 py-4 sticky top-0 z-30">
+  1812→          <div className="flex items-center justify-between">
+  1813→            <div className="flex items-center gap-2 text-sm">
+  1814→              <span className="text-gray-500">Restaurant Portal</span>
+  1815→              <span className="text-gray-400">/</span>
+  1816→              <span className="font-medium text-gray-800">{getBreadcrumb()}</span>
+  1817→            </div>
+  1818→            <div className="flex items-center gap-3">
+  1819→              {session?.user?.name && (
+  1820→                <span className="text-sm text-gray-600 hidden sm:inline">{session.user.name}</span>
+  1821→              )}
+  1822→            </div>
+  1823→          </div>
+  1824→        </header>
+  1825→
+  1826→        {/* Content Body */}
+  1827→        <div className="p-6 max-w-7xl">
+  1828→          {restaurantOwnerSection === 'dashboard' && <RestaurantDashboard restaurantId={selectedRestaurantId} />}
+  1829→          {restaurantOwnerSection === 'orders' && <RestaurantOrders restaurantId={selectedRestaurantId} />}
+  1830→          {restaurantOwnerSection === 'menu' && <RestaurantMenu restaurantId={selectedRestaurantId} />}
+  1831→          {restaurantOwnerSection === 'earnings' && <RestaurantEarnings restaurantId={selectedRestaurantId} />}
+  1832→          {restaurantOwnerSection === 'settings' && <RestaurantSettings restaurantId={selectedRestaurantId} />}
+  1833→        </div>
+  1834→      </main>
+  1835→    </div>
+  1836→  );
+  1837→}
+  1838→

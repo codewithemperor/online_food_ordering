@@ -1,0 +1,874 @@
+     1→# 10 — Admin Portal, Restaurant Portal & Multi-Restaurant Order Flow
+     2→
+     3→## 1. Problem Statement
+     4→
+     5→The current NaijaBites system has critical gaps:
+     6→1. **No Admin SuperAdmin portal** that oversees and monitors everything
+     7→2. **No Restaurant Owner portal** for restaurants to manage their own orders/menus
+     8→3. **No multi-restaurant order splitting** — a customer ordering from 2 restaurants creates confusion
+     9→4. **No clear status flow** — who changes what, when, is undefined
+    10→
+    11→This document designs the complete architecture inspired by **Glovo** and **Chowdeck** — adapted for a student project.
+    12→
+    13→---
+    14→
+    15→## 2. Three-Portal Architecture
+    16→
+    17→```
+    18→┌──────────────────────────────────────────────────────────────────┐
+    19→│                        NaijaBites Platform                        │
+    20→│                                                                   │
+    21→│  ┌─────────────┐  ┌──────────────────┐  ┌────────────────────┐  │
+    22→│  │  CUSTOMER    │  │  RESTAURANT      │  │  ADMIN             │  │
+    23→│  │  PORTAL      │  │  OWNER PORTAL    │  │  (SUPERADMIN)      │  │
+    24→│  │             │  │  PORTAL          │  │  PORTAL             │  │
+    25→│  │ - Browse    │  │                  │  │                     │  │
+    26→│  │ - Order     │  │ - Accept/Reject  │  │ - Manage ALL       │  │
+    27→│  │ - Track     │  │   orders         │  │   restaurants      │  │
+    28→│  │ - Pay       │  │ - Update status  │  │ - Manage ALL       │  │
+    29→│  │ - Profile   │  │ - Manage menu    │  │   orders           │  │
+    30→│  │             │  │ - View earnings  │  │ - Manage users     │  │
+    31→│  │             │  │ - Restaurant     │  │ - View earnings    │  │
+    32→│  │             │  │   profile        │  │ - Dashboard        │  │
+    33→│  │             │  │                  │  │ - Assign owners    │  │
+    34→│  └─────────────┘  └──────────────────┘  └────────────────────┘  │
+    35→│                                                                   │
+    36→│  Role: CUSTOMER    Role: RESTAURANT_OWNER   Role: ADMIN          │
+    37→└──────────────────────────────────────────────────────────────────┘
+    38→```
+    39→
+    40→### 2.1 How Users Switch Portals
+    41→
+    42→The app remains a **single-page app** with client-side navigation. Portal switching is role-based:
+    43→
+    44→| User Role | Default View | Can Switch To |
+    45→|-----------|-------------|---------------|
+    46→| CUSTOMER | Customer view (home, restaurants, menu, cart, orders, profile) | — |
+    47→| RESTAURANT_OWNER | Restaurant Owner Portal (by default) | Customer view (to browse/order) |
+    48→| ADMIN | Admin Portal (by default) | Customer view (to browse/order) |
+    49→
+    50→**Implementation:** The Header shows the current portal with a switcher dropdown:
+    51→- Admin sees: "Admin Panel" ← → "Switch to Store"
+    52→- Restaurant Owner sees: "My Restaurant" ← → "Switch to Store"
+    53→- Customer sees: no switcher (always in customer view)
+    54→
+    55→---
+    56→
+    57→## 3. Order Splitting Architecture (Glovo/Chowdeck Model)
+    58→
+    59→### 3.1 The Core Concept
+    60→
+    61→When a customer orders from **multiple restaurants** in one checkout:
+    62→
+    63→```
+    64→Customer Cart:
+    65→  ├── Jollof Rice (Mama Calabar) — ₦2,500
+    66→  ├── Pounded Yam (Mama Calabar) — ₦3,000
+    67→  ├── Suya (Suya Spot)           — ₦1,500
+    68→  └── Shawarma (Sharp Sharp)     — ₦2,000
+    69→
+    70→On Checkout → System creates:
+    71→
+    72→  ORDER #NB-ORD-001 (Parent — Customer sees this)
+    73→  ├── SubOrder #NB-SUB-001-A (Mama Calabar)
+    74→  │   ├── Jollof Rice × 1 — ₦2,500
+    75→  │   └── Pounded Yam × 1 — ₦3,000
+    76→  │   Subtotal: ₦5,500 | Status: PENDING
+    77→  │
+    78→  ├── SubOrder #NB-SUB-001-B (Suya Spot)
+    79→  │   └── Suya × 1 — ₦1,500
+    80→  │   Subtotal: ₦1,500 | Status: PENDING
+    81→  │
+    82→  └── SubOrder #NB-SUB-001-C (Sharp Sharp)
+    83→      └── Shawarma × 1 — ₦2,000
+    84→      Subtotal: ₦2,000 | Status: PENDING
+    85→
+    86→  Order Total: ₦9,000 + Delivery Fees
+    87→```
+    88→
+    89→### 3.2 What Each Role Sees
+    90→
+    91→**Customer sees:** ONE order (#NB-ORD-001) with a per-restaurant breakdown showing each sub-order's status independently.
+    92→
+    93→**Restaurant Owner (Mama Calabar) sees:** Only SubOrder #NB-SUB-001-A with their items. They don't know about the other restaurants.
+    94→
+    95→**Admin sees:** Everything — the parent order AND all sub-orders.
+    96→
+    97→### 3.3 SubOrder Numbering
+    98→
+    99→```
+   100→Parent Order:  NB-ORD-20240115-001
+   101→SubOrder:      NB-ORD-20240115-001-A  (first restaurant)
+   102→SubOrder:      NB-ORD-20240115-001-B  (second restaurant)
+   103→SubOrder:      NB-ORD-20240115-001-C  (third restaurant)
+   104→```
+   105→
+   106→---
+   107→
+   108→## 4. Order Status Flow — Who Changes What
+   109→
+   110→### 4.1 SubOrder Status Lifecycle
+   111→
+   112→```
+   113→                    ┌──────────────┐
+   114→                    │   PENDING    │ ← Initial state when order is placed
+   115→                    └──────┬───────┘
+   116→                           │
+   117→              ┌────────────┼─────────────┐
+   118→              │            │             │
+   119→    ┌─────────▼──────┐    │    ┌────────▼────────┐
+   120→    │   CONFIRMED    │    │    │   CANCELLED     │
+   121→    │  (Restaurant   │    │    │  (Restaurant    │
+   122→    │   Owner        │    │    │   Owner rejects │
+   123→    │   accepts)     │    │    │   OR Customer   │
+   124→    └────────┬───────┘    │    │   cancels       │
+   125→             │            │    └─────────────────┘
+   126→    ┌────────▼───────┐    │
+   127→    │   PREPARING    │    │    ★ ADMIN can force ANY
+   128→    │  (Restaurant   │    │      status change on ANY
+   129→    │   Owner starts │    │      sub-order at ANY time
+   130→    │   cooking)     │    │
+   131→    └────────┬───────┘    │
+   132→             │            │
+   133→    ┌────────▼───────┐    │
+   134→    │     READY      │    │
+   135→    │  (Restaurant   │    │
+   136→    │   Owner marks  │    │
+   137→    │   food ready)  │    │
+   138→    └────────┬───────┘    │
+   139→             │            │
+   140→    ┌────────▼───────┐    │
+   141→    │   ON_THE_WAY   │    │
+   142→    │  (Restaurant   │    │
+   143→    │   Owner marks  │    │
+   144→    │   dispatched)  │    │
+   145→    └────────┬───────┘    │
+   146→             │            │
+   147→    ┌────────▼───────┐    │
+   148→    │   DELIVERED    │    │
+   149→    │  (Restaurant   │    │
+   150→    │   Owner or     │    │
+   151→    │   Admin marks  │    │
+   152→    │   delivered)   │    │
+   153→    └────────────────┘    │
+   154→```
+   155→
+   156→### 4.2 Status Change Rules Matrix
+   157→
+   158→| From Status | To Status | Who Can Change | Condition |
+   159→|------------|-----------|---------------|-----------|
+   160→| PENDING | CONFIRMED | Restaurant Owner | Restaurant accepts the order |
+   161→| PENDING | CANCELLED | Restaurant Owner | Restaurant rejects (must give reason) |
+   162→| PENDING | CANCELLED | Customer | Customer cancels before confirmation |
+   163→| PENDING | CONFIRMED | Admin | Admin can force-accept |
+   164→| PENDING | CANCELLED | Admin | Admin can force-cancel |
+   165→| CONFIRMED | PREPARING | Restaurant Owner | Restaurant starts cooking |
+   166→| CONFIRMED | CANCELLED | Admin | Admin can cancel after confirmation |
+   167→| PREPARING | READY | Restaurant Owner | Food is ready for pickup |
+   168→| PREPARING | CANCELLED | Admin | Admin can cancel during preparation |
+   169→| READY | ON_THE_WAY | Restaurant Owner | Dispatched for delivery |
+   170→| ON_THE_WAY | DELIVERED | Restaurant Owner | Confirms delivery |
+   171→| ON_THE_WAY | DELIVERED | Admin | Admin confirms delivery |
+   172→| Any | Any | Admin | Admin has override power |
+   173→
+   174→### 4.3 Parent Order Status Derivation
+   175→
+   176→The parent Order status is **computed** from its SubOrders:
+   177→
+   178→```typescript
+   179→function deriveParentStatus(subOrders: SubOrder[]): OrderStatus {
+   180→  const statuses = subOrders.map(s => s.status);
+   181→  
+   182→  // ALL cancelled → parent cancelled
+   183→  if (statuses.every(s => s === 'CANCELLED')) return 'CANCELLED';
+   184→  
+   185→  // ALL delivered → parent delivered
+   186→  if (statuses.every(s => s === 'DELIVERED')) return 'DELIVERED';
+   187→  
+   188→  // Filter out cancelled (they're "done")
+   189→  const active = statuses.filter(s => s !== 'CANCELLED');
+   190→  
+   191→  if (active.length === 0) return 'CANCELLED'; // all cancelled
+   192→  
+   193→  // Find the "lowest" status among active sub-orders
+   194→  const statusOrder = ['PENDING', 'CONFIRMED', 'PREPARING', 'READY', 'ON_THE_WAY', 'DELIVERED'];
+   195→  const minIndex = Math.min(...active.map(s => statusOrder.indexOf(s)));
+   196→  
+   197→  return statusOrder[minIndex] as OrderStatus;
+   198→}
+   199→```
+   200→
+   201→### 4.4 Customer Order View
+   202→
+   203→When a customer views their order, they see:
+   204→
+   205→```
+   206→┌─────────────────────────────────────────────┐
+   207→│  Order #NB-ORD-20240115-001                 │
+   208→│  Overall: In Progress                       │
+   209→│                                              │
+   210→│  ┌─ Mama Calabar ──────── PREPARING 🟡 ──┐  │
+   211→│  │  Jollof Rice × 1          ₦2,500      │  │
+   212→│  │  Pounded Yam × 1          ₦3,000      │  │
+   213→│  │  Subtotal:                ₦5,500      │  │
+   214→│  └────────────────────────────────────────┘  │
+   215→│                                              │
+   216→│  ┌─ Suya Spot ─────────── CONFIRMED 🟢 ──┐  │
+   217→│  │  Suya × 1                 ₦1,500      │  │
+   218→│  │  Subtotal:                ₦1,500      │  │
+   219→│  └────────────────────────────────────────┘  │
+   220→│                                              │
+   221→│  ┌─ Sharp Sharp ───────── ON_THE_WAY 🔵 ─┐  │
+   222→│  │  Shawarma × 1             ₦2,000      │  │
+   223→│  │  Subtotal:                ₦2,000      │  │
+   224→│  └────────────────────────────────────────┘  │
+   225→│                                              │
+   226→│  Delivery Fee:    ₦1,500 (₦500 × 3)         │
+   227→│  Total:           ₦10,500                    │
+   228→│  Payment:         Paid (Paystack)            │
+   229→└─────────────────────────────────────────────┘
+   230→```
+   231→
+   232→---
+   233→
+   234→## 5. Delivery Fee Model
+   235→
+   236→**Per-Restaurant Delivery Fee (like Chowdeck):**
+   237→- Each restaurant charges a delivery fee
+   238→- ₦500 per restaurant for orders under ₦5,000 from that restaurant
+   239→- FREE delivery per restaurant if that restaurant's subtotal ≥ ₦5,000
+   240→
+   241→```
+   242→Example:
+   243→  Mama Calabar:  ₦5,500 subtotal → ₦0 delivery (free over ₦5K)
+   244→  Suya Spot:     ₦1,500 subtotal → ₦500 delivery
+   245→  Sharp Sharp:   ₦2,000 subtotal → ₦500 delivery
+   246→  
+   247→  Total Delivery Fee: ₦1,000
+   248→  Total Order:        ₦10,000
+   249→```
+   250→
+   251→---
+   252→
+   253→## 6. Restaurant Owner Portal Design
+   254→
+   255→### 6.1 Navigation
+   256→
+   257→```
+   258→RestaurantOwnerLayout
+   259→├── RestaurantSidebar (left, w-64, bg-green-700)
+   260→│   ├── Logo ("NaijaBites — Restaurant")
+   261→│   ├── Restaurant Name + Image
+   262→│   ├── NavigationMenu
+   263→│   │   ├── Dashboard (LayoutDashboard icon)
+   264→│   │   ├── Orders (ShoppingCart icon)
+   265→│   │   │   ├── Pending (badge count)
+   266→│   │   │   ├── Active
+   267→│   │   │   └── Completed
+   268→│   │   ├── Menu (Utensils icon)
+   269→│   │   ├── Earnings (Banknote icon)
+   270→│   │   └── Settings (Settings icon)
+   271→│   ├── Toggle: Open/Closed for orders
+   272→│   └── SwitchToStoreButton
+   273→├── RestaurantContent (right, flex-1, bg-gray-50, ml-64)
+   274→│   ├── ContentHeader
+   275→│   └── ContentBody
+   276→│       └── [Active Restaurant Section]
+   277→```
+   278→
+   279→### 6.2 Restaurant Owner Dashboard
+   280→
+   281→```
+   282→┌──────────────────────────────────────────────────────┐
+   283→│  Dashboard — Mama Calabar                            │
+   284→│                                                       │
+   285→│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐│
+   286→│  │ New      │ │ Active   │ │ Completed │ │ Today's  ││
+   287→│  │ Orders   │ │ Orders   │ │ Today     │ │ Earnings ││
+   288→│  │    3     │ │    2     │ │    8      │ │  ₦25,000 ││
+   289→│  └──────────┘ └──────────┘ └──────────┘ └──────────┘│
+   290→│                                                       │
+   291→│  ┌─ Pending Orders (Need Action!) ──────────────────┐│
+   292→│  │ #NB-SUB-001-B — Suya Spot items — ₦1,500  [Accept] [Reject] │
+   293→│  │ #NB-SUB-001-C — Sharp Sharp items — ₦2,000 [Accept] [Reject] │
+   294→│  └──────────────────────────────────────────────────┘│
+   295→│                                                       │
+   296→│  ┌─ Recent Active Orders ───────────────────────────┐│
+   297→│  │ #NB-SUB-001-A — ₦5,500 — PREPARING  [Mark Ready]│
+   298→│  │ #NB-SUB-0008  — ₦3,200 — READY      [Dispatch]  │
+   299→│  └──────────────────────────────────────────────────┘│
+   300→└──────────────────────────────────────────────────────┘
+   301→```
+   302→
+   303→### 6.3 Restaurant Owner Order Management
+   304→
+   305→When a restaurant owner clicks on an order:
+   306→
+   307→```
+   308→┌──────────────────────────────────────────────────────┐
+   309→│  SubOrder #NB-SUB-001-A                              │
+   310→│  From Order: #NB-ORD-20240115-001                    │
+   311→│  Customer: John Doe • +2348012345678                 │
+   312→│  Delivery: 15 Allen Avenue, Ikeja, Lagos             │
+   313→│                                                       │
+   314→│  Items:                                               │
+   315→│  ┌──────────────────────────────────────────┐        │
+   316→│  │ Jollof Rice × 2              ₦5,000     │        │
+   317→│  │ Pounded Yam & Egusi × 1      ₦3,000     │        │
+   318→│  └──────────────────────────────────────────┘        │
+   319→│  Subtotal: ₦8,000                                     │
+   320→│                                                       │
+   321→│  Status Timeline:                                     │
+   322→│  ✅ PENDING    — 2:00 PM (Auto)                      │
+   323→│  ✅ CONFIRMED  — 2:02 PM (You accepted)              │
+   324→│  🔵 PREPARING  — 2:05 PM (You started cooking)       │
+   325→│  ⬜ READY      — Pending                             │
+   326→│  ⬜ ON_THE_WAY — Pending                             │
+   327→│  ⬜ DELIVERED  — Pending                             │
+   328→│                                                       │
+   329→│  [Mark as Ready]                                      │
+   330→│  [Cancel Order]                                       │
+   331→└──────────────────────────────────────────────────────┘
+   332→```
+   333→
+   334→### 6.4 Restaurant Owner Menu Management
+   335→
+   336→Restaurant owners can ONLY manage foods for their own restaurant:
+   337→- Add new food items
+   338→- Edit food name, description, price, image
+   339→- Toggle food availability (isAvailable)
+   340→- CANNOT delete categories, CANNOT change restaurant details (Admin does that)
+   341→
+   342→### 6.5 Restaurant Owner Earnings
+   343→
+   344→```
+   345→┌──────────────────────────────────────────────────────┐
+   346→│  Earnings — Mama Calabar                             │
+   347→│                                                       │
+   348→│  ┌──────────┐ ┌──────────┐ ┌──────────┐             │
+   349→│  │ Total    │ │ Platform │ │ Your     │             │
+   350→│  │ Revenue  │ │ Commission│ │ Earnings │             │
+   351→│  │ ₦150,000 │ │ ₦15,000  │ │ ₦135,000 │             │
+   352→│  │          │ │ (10%)    │ │ (90%)    │             │
+   353→│  └──────────┘ └──────────┘ └──────────┘             │
+   354→│                                                       │
+   355→│  Commission Rate: 10%                                 │
+   356→│                                                       │
+   357→│  ┌─ Recent Earnings ────────────────────────────────┐│
+   358→│  │ Date       | Orders | Revenue | Commission | Net  ││
+   359→│  │ 2024-01-15 |   8    | ₦25,000 | ₦2,500    | ₦22,500│
+   360→│  │ 2024-01-14 |   12   | ₦40,000 | ₦4,000    | ₦36,000│
+   361→│  └──────────────────────────────────────────────────┘│
+   362→└──────────────────────────────────────────────────────┘
+   363→```
+   364→
+   365→---
+   366→
+   367→## 7. Admin (SuperAdmin) Portal — Enhanced
+   368→
+   369→### 7.1 What Admin Can Do (That Restaurant Owner Cannot)
+   370→
+   371→| Feature | Admin | Restaurant Owner |
+   372→|---------|-------|-----------------|
+   373→| View ALL orders across ALL restaurants | ✅ | ❌ (own only) |
+   374→| View ALL sub-orders | ✅ | ❌ (own only) |
+   375→| Change ANY sub-order status | ✅ | ❌ (own only, limited) |
+   376→| Cancel ANY order | ✅ | ❌ (own sub-orders only) |
+   377→| Manage ALL restaurants (CRUD) | ✅ | ❌ |
+   378→| Assign restaurant owners | ✅ | ❌ |
+   379→| Activate/deactivate restaurants | ✅ | ❌ |
+   380→| Manage ALL categories | ✅ | ❌ |
+   381→| Manage ALL food items | ✅ | ❌ (own restaurant only) |
+   382→| Manage ALL users | ✅ | ❌ |
+   383→| Block/unblock users | ✅ | ❌ |
+   384→| View platform-wide earnings | ✅ | ❌ (own only) |
+   385→| View platform commissions | ✅ | ❌ |
+   386→| Manage delivery fees | ✅ | ❌ |
+   387→
+   388→### 7.2 Enhanced Admin Dashboard
+   389→
+   390→```
+   391→┌──────────────────────────────────────────────────────────────┐
+   392→│  Admin Dashboard                                             │
+   393→│                                                               │
+   394→│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+   395→│  │ Total    │ │ Total    │ │ Platform │ │ Active   │       │
+   396→│  │ Orders   │ │ Revenue  │ │ Commission│ │ Restaurants│     │
+   397→│  │   156    │ │ ₦850,000 │ │ ₦85,000  │ │    5     │       │
+   398→│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+   399→│                                                               │
+   400→│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐       │
+   401→│  │ Pending  │ │ Today's  │ │ Today's  │ │ Total    │       │
+   402→│  │ SubOrders│ │ Orders   │ │ Revenue  │ │ Customers│       │
+   403→│  │    7     │ │    23    │ │ ₦45,000  │ │   89     │       │
+   404→│  └──────────┘ └──────────┘ └──────────┘ └──────────┘       │
+   405→│                                                               │
+   406→│  ┌─ Orders Needing Attention ──────────────────────────────┐│
+   407→│  │ ⚠️ 3 sub-orders PENDING for 15+ minutes               ││
+   408→│  │ ⚠️ 1 restaurant offline with active orders             ││
+   409→│  └─────────────────────────────────────────────────────────┘│
+   410→│                                                               │
+   411→│  ┌─ Per-Restaurant Summary ────────────────────────────────┐│
+   412→│  │ Restaurant      | Orders Today | Revenue | Status       ││
+   413→│  │ Mama Calabar    |      8       | ₦25,000 | 🟢 Online   ││
+   414→│  │ Suya Spot       |      5       | ₦8,000  | 🟢 Online   ││
+   415→│  │ Sharp Sharp     |      3       | ₦6,000  | 🔴 Offline  ││
+   416→│  │ Wok & Roll      |      4       | ₦9,000  | 🟢 Online   ││
+   417→│  │ Zobo Palace     |      3       | ₦7,000  | 🟢 Online   ││
+   418→│  └─────────────────────────────────────────────────────────┘│
+   419→└──────────────────────────────────────────────────────────────┘
+   420→```
+   421→
+   422→### 7.3 Admin Orders View
+   423→
+   424→Admin sees the parent order with ALL sub-orders:
+   425→
+   426→```
+   427→┌──────────────────────────────────────────────────────────────┐
+   428→│  Order #NB-ORD-20240115-001 — John Doe                      │
+   429→│  Overall: PREPARING | Total: ₦10,500 | Paid                 │
+   430→│                                                               │
+   431→│  ┌─ SubOrder A — Mama Calabar — PREPARING ────────────────┐ │
+   432→│  │ Jollof Rice × 2 (₦5,000), Pounded Yam × 1 (₦3,000)   │ │
+   433→│  │ Subtotal: ₦8,000 | Commission: ₦800 | Earnings: ₦7,200 │ │
+   434→│  │ [Change Status ▼] Admin override available              │ │
+   435→│  └─────────────────────────────────────────────────────────┘ │
+   436→│                                                               │
+   437→│  ┌─ SubOrder B — Suya Spot — CONFIRMED ───────────────────┐ │
+   438→│  │ Suya × 1 (₦1,500)                                      │ │
+   439→│  │ Subtotal: ₦1,500 | Commission: ₦150 | Earnings: ₦1,350 │ │
+   440→│  │ [Change Status ▼] Admin override available              │ │
+   441→│  └─────────────────────────────────────────────────────────┘ │
+   442→│                                                               │
+   443→│  ┌─ SubOrder C — Sharp Sharp — ON_THE_WAY ────────────────┐ │
+   444→│  │ Shawarma × 1 (₦2,000)                                  │ │
+   445→│  │ Subtotal: ₦2,000 | Commission: ₦200 | Earnings: ₦1,800 │ │
+   446→│  │ [Change Status ▼] Admin override available              │ │
+   447→│  └─────────────────────────────────────────────────────────┘ │
+   448→│                                                               │
+   449→│  Delivery: ₦1,000 (₦500 × 2, Mama Calabar free over ₦5K)  │
+   450→└──────────────────────────────────────────────────────────────┘
+   451→```
+   452→
+   453→---
+   454→
+   455→## 8. Cart Changes — Multi-Restaurant Support
+   456→
+   457→### 8.1 Current State
+   458→The cart currently allows items from ONE restaurant only (enforced in `addItem`).
+   459→
+   460→### 8.2 New Behavior
+   461→The cart now allows items from **multiple restaurants**:
+   462→- Items are grouped by restaurant in the cart panel
+   463→- Each restaurant group shows its own subtotal
+   464→- Delivery fee is calculated per-restaurant
+   465→- A warning shows: "Items from N restaurants — each restaurant delivers separately"
+   466→
+   467→### 8.3 Cart Store Changes
+   468→
+   469→```typescript
+   470→interface CartStore {
+   471→  items: CartItem[];
+   472→  isOpen: boolean;
+   473→  
+   474→  // NEW: Group items by restaurant
+   475→  getGroupedByRestaurant: () => Map<string, CartItem[]>;
+   476→  getRestaurantCount: () => number;  // how many restaurants in cart
+   477→  
+   478→  // Existing (modified)
+   479→  getSubtotal: () => number;                    // total across all restaurants
+   480→  getDeliveryFee: () => number;                 // sum of per-restaurant delivery fees
+   481→  getPerRestaurantDeliveryFee: (restaurantId: string) => number;  // per restaurant
+   482→  getPerRestaurantSubtotal: (restaurantId: string) => number;     // per restaurant
+   483→  
+   484→  // REMOVE: getRestaurantId() — no longer single-restaurant
+   485→  // REMOVE: single-restaurant restriction in addItem
+   486→}
+   487→```
+   488→
+   489→---
+   490→
+   491→## 9. Database Schema Changes
+   492→
+   493→### 9.1 New/Modified Models
+   494→
+   495→```prisma
+   496→model User {
+   497→  // ... existing fields ...
+   498→  role      String   @default("CUSTOMER")  // NOW: CUSTOMER | ADMIN | RESTAURANT_OWNER
+   499→  // ... 
+   500→  ownedRestaurants Restaurant[]  // NEW: for RESTAURANT_OWNER role
+   501→}
+   502→
+   503→model Restaurant {
+   504→  // ... existing fields ...
+   505→  ownerId         String?   // NEW: links to User (RESTAURANT_OWNER)
+   506→  owner           User?     @relation(fields: [ownerId], references: [id])
+   507→  commissionRate  Float     @default(10)  // NEW: platform commission %
+   508→  // ...
+   509→  subOrders       SubOrder[]  // CHANGED: from orders to subOrders
+   510→}
+   511→
+   512→// NEW: SubOrder — the per-restaurant fulfillment order
+   513→model SubOrder {
+   514→  id               String   @id @default(cuid())
+   515→  subOrderNumber   String   @unique
+   516→  orderId          String
+   517→  order            Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+   518→  restaurantId     String
+   519→  restaurant       Restaurant @relation(fields: [restaurantId], references: [id])
+   520→  status           String   @default("PENDING")
+   521→  subtotal         Float
+   522→  deliveryFee      Float    @default(0)
+   523→  commissionRate   Float    @default(10)
+   524→  commissionAmount Float    @default(0)
+   525→  restaurantEarnings Float  @default(0)
+   526→  estimatedPrepTime Int?    // minutes
+   527→  preparedAt       DateTime?
+   528→  readyAt          DateTime?
+   529→  pickedUpAt       DateTime?
+   530→  deliveredAt      DateTime?
+   531→  cancelledAt      DateTime?
+   532→  cancelReason     String?
+   533→  createdAt        DateTime @default(now())
+   534→  updatedAt        DateTime @updatedAt
+   535→  
+   536→  items          OrderItem[]
+   537→  statusHistory  SubOrderStatusHistory[]
+   538→}
+   539→
+   540→// CHANGED: OrderItem now links to SubOrder
+   541→model OrderItem {
+   542→  id          String   @id @default(cuid())
+   543→  subOrderId  String   // CHANGED from orderId
+   544→  subOrder    SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+   545→  foodId      String
+   546→  food        Food     @relation(fields: [foodId], references: [id])
+   547→  foodName    String
+   548→  foodImage   String?
+   549→  quantity    Int      @default(1)
+   550→  unitPrice   Float
+   551→  totalPrice  Float
+   552→}
+   553→
+   554→// NEW: SubOrder status history
+   555→model SubOrderStatusHistory {
+   556→  id             String   @id @default(cuid())
+   557→  subOrderId     String
+   558→  subOrder       SubOrder @relation(fields: [subOrderId], references: [id], onDelete: Cascade)
+   559→  status         String
+   560→  remark         String?
+   561→  changedBy      String?  // userId
+   562→  changedByRole  String?  // CUSTOMER | RESTAURANT_OWNER | ADMIN | SYSTEM
+   563→  createdAt      DateTime @default(now())
+   564→}
+   565→
+   566→// Order (Parent) — restaurantId REMOVED
+   567→model Order {
+   568→  // ... all existing fields EXCEPT restaurantId and restaurant relation ...
+   569→  // ADD:
+   570→  subOrders    SubOrder[]
+   571→  // KEEP:
+   572→  items        OrderItem[]  // convenience: all items across all sub-orders
+   573→  statusHistory OrderStatusHistory[]
+   574→}
+   575→```
+   576→
+   577→---
+   578→
+   579→## 10. API Routes — New & Modified
+   580→
+   581→### 10.1 Restaurant Owner API Routes
+   582→
+   583→```
+   584→GET    /api/restaurant-owner/dashboard    — Restaurant owner dashboard stats
+   585→GET    /api/restaurant-owner/orders       — List sub-orders for owned restaurants
+   586→GET    /api/restaurant-owner/orders/:id   — Get sub-order detail
+   587→PUT    /api/restaurant-owner/orders/:id/status — Update sub-order status
+   588→GET    /api/restaurant-owner/foods        — List foods for owned restaurant(s)
+   589→POST   /api/restaurant-owner/foods        — Add food to owned restaurant
+   590→PUT    /api/restaurant-owner/foods/:id    — Update food in owned restaurant
+   591→DELETE /api/restaurant-owner/foods/:id    — Delete food from owned restaurant
+   592→GET    /api/restaurant-owner/earnings     — Earnings for owned restaurant(s)
+   593→PUT    /api/restaurant-owner/profile      — Update restaurant profile/settings
+   594→POST   /api/restaurant-owner/toggle-status — Toggle restaurant open/closed
+   595→```
+   596→
+   597→### 10.2 Modified Checkout Flow
+   598→
+   599→```
+   600→POST /api/orders (checkout)
+   601→  1. Validate cart items (server-side price verification)
+   602→  2. Group items by restaurantId
+   603→  3. Create ONE Order (parent) — total amount, delivery info, payment info
+   604→  4. For each restaurant group:
+   605→     a. Create SubOrder with restaurant-specific items
+   606→     b. Calculate per-restaurant delivery fee
+   607→     c. Calculate commission (subtotal × commissionRate / 100)
+   608→     d. Calculate restaurant earnings (subtotal - commission)
+   609→     e. Create OrderItems under the SubOrder
+   610→     f. Create initial SubOrderStatusHistory (PENDING, changedBy: SYSTEM)
+   611→  5. Create initial OrderStatusHistory (PENDING, changedBy: SYSTEM)
+   612→  6. Initialize Paystack payment (if PAYSTACK method)
+   613→  7. Return parent order with sub-orders
+   614→```
+   615→
+   616→### 10.3 Modified Orders API
+   617→
+   618→```
+   619→GET /api/orders
+   620→  - Customer: returns their orders with sub-orders
+   621→  - Restaurant Owner: returns sub-orders for their restaurants
+   622→  - Admin: returns ALL orders with sub-orders
+   623→
+   624→GET /api/orders/:id
+   625→  - Customer: their order with sub-orders and per-restaurant breakdown
+   626→  - Restaurant Owner: parent order but only their sub-order details
+   627→  - Admin: full order with all sub-orders
+   628→```
+   629→
+   630→---
+   631→
+   632→## 11. Auth Changes
+   633→
+   634→### 11.1 New Role: RESTAURANT_OWNER
+   635→
+   636→```typescript
+   637→export type Role = 'CUSTOMER' | 'ADMIN' | 'RESTAURANT_OWNER';
+   638→```
+   639→
+   640→### 11.2 New Auth Helper
+   641→
+   642→```typescript
+   643→export async function requireRestaurantOwner() {
+   644→  const { error, session } = await requireAuth();
+   645→  if (error) return { error, session: null };
+   646→  if (session!.user.role !== 'RESTAURANT_OWNER' && session!.user.role !== 'ADMIN') {
+   647→    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }), session: null };
+   648→  }
+   649→  return { error: null, session };
+   650→}
+   651→
+   652→// Verify that the restaurant owner owns a specific restaurant
+   653→export async function requireRestaurantOwnership(restaurantId: string) {
+   654→  const { error, session } = await requireAuth();
+   655→  if (error) return { error, session: null, restaurant: null };
+   656→  
+   657→  if (session!.user.role === 'ADMIN') {
+   658→    // Admin has access to everything
+   659→    const restaurant = await db.restaurant.findUnique({ where: { id: restaurantId } });
+   660→    return { error: null, session, restaurant };
+   661→  }
+   662→  
+   663→  if (session!.user.role !== 'RESTAURANT_OWNER') {
+   664→    return { error: NextResponse.json({ error: 'Forbidden' }, { status: 403 }), session: null, restaurant: null };
+   665→  }
+   666→  
+   667→  const restaurant = await db.restaurant.findFirst({
+   668→    where: { id: restaurantId, ownerId: session!.user.id }
+   669→  });
+   670→  
+   671→  if (!restaurant) {
+   672→    return { error: NextResponse.json({ error: 'Not your restaurant' }, { status: 403 }), session: null, restaurant: null };
+   673→  }
+   674→  
+   675→  return { error: null, session, restaurant };
+   676→}
+   677→```
+   678→
+   679→### 11.3 Session Enhancement
+   680→
+   681→Add `ownedRestaurantIds` to the JWT session for RESTAURANT_OWNER:
+   682→
+   683→```typescript
+   684→// In auth.ts callbacks
+   685→async jwt({ token, user }) {
+   686→  if (user) {
+   687→    token.role = user.role;
+   688→    token.id = user.id;
+   689→    
+   690→    // If restaurant owner, include their restaurant IDs
+   691→    if (user.role === 'RESTAURANT_OWNER') {
+   692→      const restaurants = await db.restaurant.findMany({
+   693→        where: { ownerId: user.id },
+   694→        select: { id: true }
+   695→      });
+   696→      token.ownedRestaurantIds = restaurants.map(r => r.id);
+   697→    }
+   698→  }
+   699→  return token;
+   700→}
+   701→```
+   702→
+   703→---
+   704→
+   705→## 12. Navigation & UI Flow
+   706→
+   707→### 12.1 Updated NavigationSection Type
+   708→
+   709→```typescript
+   710→export type NavigationSection = 
+   711→  | 'home' | 'restaurants' | 'menu' | 'orders' | 'profile' 
+   712→  | 'admin' | 'restaurant-owner';
+   713→```
+   714→
+   715→### 12.2 Updated Navigation Store
+   716→
+   717→```typescript
+   718→interface NavigationStore {
+   719→  activeSection: NavigationSection;
+   720→  setActiveSection: (section: NavigationSection) => void;
+   721→  
+   722→  adminSection: AdminSection;
+   723→  setAdminSection: (section: AdminSection) => void;
+   724→  
+   725→  // NEW
+   726→  restaurantOwnerSection: RestaurantOwnerSection;
+   727→  setRestaurantOwnerSection: (section: RestaurantOwnerSection) => void;
+   728→  
+   729→  // ... existing filters ...
+   730→}
+   731→
+   732→export type RestaurantOwnerSection = 
+   733→  | 'dashboard' | 'orders' | 'menu' | 'earnings' | 'settings';
+   734→```
+   735→
+   736→### 12.3 Header Switcher
+   737→
+   738→```
+   739→For ADMIN user:
+   740→┌─────────────────────────────────────────────────┐
+   741→│ 🍽️ NaijaBites  |  Home  Restaurants  Menu  | 👤 Admin Panel ▼ │
+   742→│                                                │ │ Switch to Store │ │
+   743→│                                                │ └─────────────────┘ │
+   744→└─────────────────────────────────────────────────┘
+   745→
+   746→For RESTAURANT_OWNER user:
+   747→┌─────────────────────────────────────────────────┐
+   748→│ 🍽️ NaijaBites  |  Home  Restaurants  Menu  | 👤 My Restaurant ▼ │
+   749→│                                                │ │ Switch to Store │ │
+   750→│                                                │ └─────────────────┘ │
+   751→└─────────────────────────────────────────────────┘
+   752→```
+   753→
+   754→---
+   755→
+   756→## 13. Seed Data — Restaurant Owners
+   757→
+   758→### 13.1 New Users
+   759→
+   760→```typescript
+   761→// Restaurant owners (each linked to a restaurant)
+   762→const owner1 = await prisma.user.upsert({
+   763→  where: { email: 'mama@calabar.ng' },
+   764→  update: {},
+   765→  create: {
+   766→    name: 'Mama Calabar',
+   767→    email: 'mama@calabar.ng',
+   768→    password: await hash('owner123', 12),
+   769→    phone: '+2348011111111',
+   770→    role: 'RESTAURANT_OWNER',
+   771→  },
+   772→});
+   773→
+   774→const owner2 = await prisma.user.upsert({
+   775→  where: { email: 'suya@spot.ng' },
+   776→  update: {},
+   777→  create: {
+   778→    name: 'Alhaji Suya',
+   779→    email: 'suya@spot.ng',
+   780→    password: await hash('owner123', 12),
+   781→    phone: '+2348022222222',
+   782→    role: 'RESTAURANT_OWNER',
+   783→  },
+   784→});
+   785→
+   786→// ... more owners ...
+   787→
+   788→// Then link owners to restaurants:
+   789→await prisma.restaurant.update({
+   790→  where: { id: mamaCalabar.id },
+   791→  data: { ownerId: owner1.id },
+   792→});
+   793→```
+   794→
+   795→### 13.2 Test Credentials
+   796→
+   797→| Role | Email | Password |
+   798→|------|-------|----------|
+   799→| Admin | admin@naijabites.ng | admin123 |
+   800→| Customer | customer@test.com | password123 |
+   801→| Restaurant Owner (Mama Calabar) | mama@calabar.ng | owner123 |
+   802→| Restaurant Owner (Suya Spot) | suya@spot.ng | owner123 |
+   803→| Restaurant Owner (Sharp Sharp) | sharp@sharp.ng | owner123 |
+   804→| Restaurant Owner (Wok & Roll) | wok@roll.ng | owner123 |
+   805→| Restaurant Owner (Zobo Palace) | zobo@palace.ng | owner123 |
+   806→
+   807→---
+   808→
+   809→## 14. Implementation Order
+   810→
+   811→```
+   812→Step 1: Schema Migration
+   813→  - Update prisma/schema.prisma with SubOrder, SubOrderStatusHistory models
+   814→  - Add ownerId to Restaurant
+   815→  - Add RESTAURANT_OWNER role
+   816→  - Remove restaurantId from Order (or make it nullable for backwards compat)
+   817→  - Run db:push
+   818→
+   819→Step 2: Types & Auth Updates
+   820→  - Update types/index.ts with SubOrder types, new Role, RestaurantOwnerSection
+   821→  - Update auth.ts with RESTAURANT_OWNER JWT handling
+   822→  - Add requireRestaurantOwner(), requireRestaurantOwnership() auth helpers
+   823→
+   824→Step 3: Seed Data
+   825→  - Create restaurant owner users
+   826→  - Link owners to existing restaurants
+   827→  - Run seed
+   828→
+   829→Step 4: Cart Store Update
+   830→  - Remove single-restaurant restriction
+   831→  - Add multi-restaurant grouping methods
+   832→  - Per-restaurant delivery fee calculation
+   833→
+   834→Step 5: Navigation & Page Updates
+   835→  - Add 'restaurant-owner' to NavigationSection
+   836→  - Add restaurantOwnerSection to navigation store
+   837→  - Add RestaurantOwnerLayout to page.tsx switch
+   838→
+   839→Step 6: Restaurant Owner API Routes
+   840→  - /api/restaurant-owner/dashboard
+   841→  - /api/restaurant-owner/orders (+ status updates)
+   842→  - /api/restaurant-owner/foods
+   843→  - /api/restaurant-owner/earnings
+   844→  - /api/restaurant-owner/profile
+   845→
+   846→Step 7: Restaurant Owner UI
+   847→  - RestaurantOwnerLayout component
+   848→  - RestaurantDashboard
+   849→  - RestaurantOrders (with accept/reject/status flow)
+   850→  - RestaurantMenu
+   851→  - RestaurantEarnings
+   852→  - RestaurantSettings
+   853→
+   854→Step 8: Update Checkout Flow
+   855→  - Modify POST /api/orders to create SubOrders
+   856→  - Group items by restaurant
+   857→  - Calculate commissions and delivery fees
+   858→
+   859→Step 9: Update Customer Orders View
+   860→  - Show per-restaurant breakdown in OrdersSection
+   861→  - Sub-order status timeline
+   862→  - Allow cancel before confirmation
+   863→
+   864→Step 10: Update Admin Portal
+   865→  - Show sub-orders in admin order view
+   866→  - Per-restaurant summary on dashboard
+   867→  - Commission tracking
+   868→  - Restaurant owner management (assign/remove owners)
+   869→
+   870→Step 11: Header Update
+   871→  - Add portal switcher for ADMIN and RESTAURANT_OWNER
+   872→  - Show appropriate navigation based on current portal
+   873→```
+   874→

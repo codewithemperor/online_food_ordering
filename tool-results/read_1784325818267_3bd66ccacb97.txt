@@ -1,0 +1,673 @@
+     1→     1→'use client';
+     2→     2→
+     3→     3→import { useAuth } from '@/hooks/useAuth';
+     4→     4→import { useNavigationStore } from '@/stores/navigation-store';
+     5→     5→import { useUIStore } from '@/stores/ui-store';
+     6→     6→import { LayoutDashboard, Store, Tag, UtensilsCrossed, ShoppingCart, Users, DollarSign, LogOut, ArrowLeft, Plus, Edit, Trash2, Search, Upload, X, CheckCircle, XCircle, Clock, ChefHat, Truck, Eye, UserCheck } from 'lucide-react';
+     7→     7→import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+     8→     8→import { formatNaira, getStatusColor } from '@/lib/utils';
+     9→     9→import { useState } from 'react';
+    10→    10→import toast from 'react-hot-toast';
+    11→    11→
+    12→    12→type AdminSection = 'dashboard' | 'restaurants' | 'categories' | 'foods' | 'orders' | 'customers' | 'earnings' | 'owners';
+    13→    13→
+    14→    14→const adminNav = [
+    15→    15→  { key: 'dashboard' as AdminSection, label: 'Dashboard', icon: LayoutDashboard },
+    16→    16→  { key: 'restaurants' as AdminSection, label: 'Restaurants', icon: Store },
+    17→    17→  { key: 'categories' as AdminSection, label: 'Categories', icon: Tag },
+    18→    18→  { key: 'foods' as AdminSection, label: 'Food Menu', icon: UtensilsCrossed },
+    19→    19→  { key: 'orders' as AdminSection, label: 'Orders', icon: ShoppingCart },
+    20→    20→  { key: 'customers' as AdminSection, label: 'Customers', icon: Users },
+    21→    21→  { key: 'earnings' as AdminSection, label: 'Earnings', icon: DollarSign },
+    22→    22→  { key: 'owners' as AdminSection, label: 'Owners', icon: UserCheck },
+    23→    23→];
+    24→    24→
+    25→    25→function StatusBadge({ status }: { status: string }) {
+    26→    26→  const colors = getStatusColor(status);
+    27→    27→  return <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.bg} ${colors.text}`}>{status.replace(/_/g, ' ')}</span>;
+    28→    28→}
+    29→    29→
+    30→    30→// ─── DASHBOARD ──────────────────────────
+    31→    31→function AdminDashboard() {
+    32→    32→  const { data: stats, isLoading } = useQuery({
+    33→    33→    queryKey: ['dashboard-stats'],
+    34→    34→    queryFn: () => fetch('/api/dashboard/stats').then(r => r.json()).then(d => d.data),
+    35→    35→  });
+    36→    36→
+    37→    37→  const statCards = [
+    38→    38→    { label: 'Restaurants', value: stats?.totalRestaurants || 0, icon: Store, color: 'text-orange-500 bg-orange-50', border: 'border-l-orange-500' },
+    39→    39→    { label: 'Food Items', value: stats?.totalFoods || 0, icon: UtensilsCrossed, color: 'text-blue-500 bg-blue-50', border: 'border-l-blue-500' },
+    40→    40→    { label: 'Customers', value: stats?.totalCustomers || 0, icon: Users, color: 'text-green-500 bg-green-50', border: 'border-l-green-500' },
+    41→    41→    { label: 'Total Orders', value: stats?.totalOrders || 0, icon: ShoppingCart, color: 'text-purple-500 bg-purple-50', border: 'border-l-purple-500' },
+    42→    42→    { label: 'Pending Orders', value: stats?.pendingOrders || 0, icon: Clock, color: 'text-yellow-500 bg-yellow-50', border: 'border-l-yellow-500' },
+    43→    43→    { label: "Today's Orders", value: stats?.todayOrders || 0, icon: LayoutDashboard, color: 'text-indigo-500 bg-indigo-50', border: 'border-l-indigo-500' },
+    44→    44→    { label: 'Total Earnings', value: formatNaira(stats?.totalEarnings || 0), icon: DollarSign, color: 'text-emerald-500 bg-emerald-50', border: 'border-l-emerald-500' },
+    45→    45→    { label: 'Cancelled', value: stats?.cancelledOrders || 0, icon: XCircle, color: 'text-red-500 bg-red-50', border: 'border-l-red-500' },
+    46→    46→  ];
+    47→    47→
+    48→    48→  return (
+    49→    49→    <div>
+    50→    50→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h2>
+    51→    51→      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+    52→    52→        {isLoading ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="bg-white rounded-xl p-6 animate-pulse border-l-4 border-gray-200"><div className="h-10 bg-gray-100 rounded mb-2" /><div className="h-4 bg-gray-100 rounded w-1/2" /></div>)
+    53→    53→        : statCards.map((card, i) => (
+    54→    54→          <div key={i} className={`bg-white rounded-xl shadow-sm p-6 border-l-4 ${card.border}`}>
+    55→    55→            <div className={`w-12 h-12 rounded-lg ${card.color} flex items-center justify-center mb-3`}><card.icon className="w-6 h-6" /></div>
+    56→    56→            <p className="text-sm text-gray-500">{card.label}</p>
+    57→    57→            <p className="text-2xl font-bold text-gray-900">{card.value}</p>
+    58→    58→          </div>
+    59→    59→        ))}
+    60→    60→      </div>
+    61→    61→    </div>
+    62→    62→  );
+    63→    63→}
+    64→    64→
+    65→    65→// ─── CATEGORIES ──────────────────────────
+    66→    66→function AdminCategories() {
+    67→    67→  const qc = useQueryClient();
+    68→    68→  const [showForm, setShowForm] = useState(false);
+    69→    69→  const [editItem, setEditItem] = useState<any>(null);
+    70→    70→  const [form, setForm] = useState({ name: '', description: '', image: '' });
+    71→    71→
+    72→    72→  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => fetch('/api/categories').then(r => r.json()).then(d => d.data || []) });
+    73→    73→
+    74→    74→  const saveMutation = useMutation({
+    75→    75→    mutationFn: (data: any) => fetch('/api/categories', { method: editItem ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editItem ? { ...data, id: editItem.id } : data) }).then(r => r.json()),
+    76→    76→    onSuccess: () => { toast.success(editItem ? 'Category updated' : 'Category created'); setShowForm(false); setEditItem(null); setForm({ name: '', description: '', image: '' }); qc.invalidateQueries({ queryKey: ['categories'] }); },
+    77→    77→    onError: () => toast.error('Failed to save category'),
+    78→    78→  });
+    79→    79→
+    80→    80→  const deleteMutation = useMutation({
+    81→    81→    mutationFn: (id: string) => fetch(`/api/categories?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+    82→    82→    onSuccess: () => { toast.success('Category deleted'); qc.invalidateQueries({ queryKey: ['categories'] }); },
+    83→    83→    onError: () => toast.error('Failed to delete'),
+    84→    84→  });
+    85→    85→
+    86→    86→  const handleEdit = (cat: any) => { setEditItem(cat); setForm({ name: cat.name, description: cat.description || '', image: cat.image || '' }); setShowForm(true); };
+    87→    87→  const handleUpload = async (e: any) => {
+    88→    88→    const file = e.target.files[0]; if (!file) return;
+    89→    89→    const fd = new FormData(); fd.append('file', file);
+    90→    90→    const res = await fetch('/api/upload', { method: 'POST', body: fd });
+    91→    91→    const data = await res.json();
+    92→    92→    if (data.data?.url) setForm(p => ({ ...p, image: data.data.url }));
+    93→    93→  };
+    94→    94→
+    95→    95→  return (
+    96→    96→    <div>
+    97→    97→      <div className="flex justify-between items-center mb-6">
+    98→    98→        <h2 className="text-2xl font-bold text-gray-900">Categories</h2>
+    99→    99→        <button onClick={() => { setEditItem(null); setForm({ name: '', description: '', image: '' }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-orange-600 transition-colors"><Plus className="w-4 h-4" /> Add Category</button>
+   100→   100→      </div>
+   101→   101→
+   102→   102→      {showForm && (
+   103→   103→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+   104→   104→          <h3 className="font-semibold text-lg mb-4">{editItem ? 'Edit Category' : 'New Category'}</h3>
+   105→   105→          <div className="space-y-4">
+   106→   106→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Name</label><input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   107→   107→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   108→   108→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Image</label><input type="file" accept="image/*" onChange={handleUpload} className="w-full" />{form.image && <img src={form.image} alt="Preview" className="w-20 h-20 rounded-lg mt-2 object-cover" />}</div>
+   109→   109→            <div className="flex gap-3"><button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{saveMutation.isPending ? 'Saving...' : 'Save'}</button><button onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button></div>
+   110→   110→          </div>
+   111→   111→        </div>
+   112→   112→      )}
+   113→   113→
+   114→   114→      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+   115→   115→        {categories.map((cat: any) => (
+   116→   116→          <div key={cat.id} className="bg-white rounded-lg shadow-sm overflow-hidden border border-gray-100">
+   117→   117→            <div className="h-32 bg-gray-100 relative">{cat.image ? <img src={cat.image} alt={cat.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center"><Tag className="w-8 h-8 text-gray-400" /></div>}</div>
+   118→   118→            <div className="p-4">
+   119→   119→              <h3 className="font-semibold text-gray-900">{cat.name}</h3>
+   120→   120→              {cat.description && <p className="text-sm text-gray-500 mt-1">{cat.description}</p>}
+   121→   121→              <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
+   122→   122→                <button onClick={() => handleEdit(cat)} className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Edit className="w-3.5 h-3.5" /> Edit</button>
+   123→   123→                <button onClick={() => confirm('Delete this category?') && deleteMutation.mutate(cat.id)} className="flex-1 flex items-center justify-center gap-1 py-2 text-sm text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-3.5 h-3.5" /> Delete</button>
+   124→   124→              </div>
+   125→   125→            </div>
+   126→   126→          </div>
+   127→   127→        ))}
+   128→   128→      </div>
+   129→   129→    </div>
+   130→   130→  );
+   131→   131→}
+   132→   132→
+   133→   133→// ─── RESTAURANTS ──────────────────────────
+   134→   134→function AdminRestaurants() {
+   135→   135→  const qc = useQueryClient();
+   136→   136→  const [showForm, setShowForm] = useState(false);
+   137→   137→  const [editItem, setEditItem] = useState<any>(null);
+   138→   138→  const [form, setForm] = useState({ name: '', description: '', email: '', phone: '', address: '', city: '', state: '', openTime: '', closeTime: '', openDays: '', image: '', categoryId: '', isActive: true });
+   139→   139→
+   140→   140→  const { data: restaurants = [] } = useQuery({ queryKey: ['restaurants-admin'], queryFn: () => fetch('/api/restaurants').then(r => r.json()).then(d => d.data || []) });
+   141→   141→  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => fetch('/api/categories').then(r => r.json()).then(d => d.data || []) });
+   142→   142→
+   143→   143→  const saveMutation = useMutation({
+   144→   144→    mutationFn: (data: any) => fetch('/api/restaurants', { method: editItem ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editItem ? { ...data, id: editItem.id } : data) }).then(r => r.json()),
+   145→   145→    onSuccess: () => { toast.success(editItem ? 'Restaurant updated' : 'Restaurant created'); setShowForm(false); setEditItem(null); qc.invalidateQueries({ queryKey: ['restaurants-admin'] }); },
+   146→   146→    onError: () => toast.error('Failed to save'),
+   147→   147→  });
+   148→   148→
+   149→   149→  const deleteMutation = useMutation({
+   150→   150→    mutationFn: (id: string) => fetch(`/api/restaurants?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+   151→   151→    onSuccess: () => { toast.success('Restaurant deleted'); qc.invalidateQueries({ queryKey: ['restaurants-admin'] }); },
+   152→   152→  });
+   153→   153→
+   154→   154→  const handleEdit = (r: any) => { setEditItem(r); setForm({ name: r.name, description: r.description || '', email: r.email || '', phone: r.phone || '', address: r.address || '', city: r.city || '', state: r.state || '', openTime: r.openTime || '', closeTime: r.closeTime || '', openDays: r.openDays || '', image: r.image || '', categoryId: r.categoryId || r.category?.id || '', isActive: r.isActive }); setShowForm(true); };
+   155→   155→  const handleUpload = async (e: any) => { const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('file', file); const res = await fetch('/api/upload', { method: 'POST', body: fd }); const data = await res.json(); if (data.data?.url) setForm(p => ({ ...p, image: data.data.url })); };
+   156→   156→
+   157→   157→  return (
+   158→   158→    <div>
+   159→   159→      <div className="flex justify-between items-center mb-6">
+   160→   160→        <h2 className="text-2xl font-bold text-gray-900">Restaurants</h2>
+   161→   161→        <button onClick={() => { setEditItem(null); setForm({ name: '', description: '', email: '', phone: '', address: '', city: '', state: '', openTime: '', closeTime: '', openDays: '', image: '', categoryId: '', isActive: true }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-orange-600"><Plus className="w-4 h-4" /> Add Restaurant</button>
+   162→   162→      </div>
+   163→   163→
+   164→   164→      {showForm && (
+   165→   165→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+   166→   166→          <h3 className="font-semibold text-lg mb-4">{editItem ? 'Edit Restaurant' : 'New Restaurant'}</h3>
+   167→   167→          <div className="grid md:grid-cols-2 gap-4">
+   168→   168→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   169→   169→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Category *</label><select value={form.categoryId} onChange={(e) => setForm(p => ({ ...p, categoryId: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"><option value="">Select category</option>{categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+   170→   170→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Email</label><input type="email" value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   171→   171→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Phone</label><input type="tel" value={form.phone} onChange={(e) => setForm(p => ({ ...p, phone: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   172→   172→            <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Address</label><input type="text" value={form.address} onChange={(e) => setForm(p => ({ ...p, address: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   173→   173→            <div><label className="block text-sm font-medium text-gray-700 mb-1">City</label><input type="text" value={form.city} onChange={(e) => setForm(p => ({ ...p, city: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   174→   174→            <div><label className="block text-sm font-medium text-gray-700 mb-1">State</label><input type="text" value={form.state} onChange={(e) => setForm(p => ({ ...p, state: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   175→   175→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Open / Close Time</label><div className="flex gap-2"><input type="text" value={form.openTime} onChange={(e) => setForm(p => ({ ...p, openTime: e.target.value }))} placeholder="08:00" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /><input type="text" value={form.closeTime} onChange={(e) => setForm(p => ({ ...p, closeTime: e.target.value }))} placeholder="22:00" className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div></div>
+   176→   176→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Open Days</label><input type="text" value={form.openDays} onChange={(e) => setForm(p => ({ ...p, openDays: e.target.value }))} placeholder="Mon-Sat" className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   177→   177→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Image</label><input type="file" accept="image/*" onChange={handleUpload} className="w-full" />{form.image && <img src={form.image} alt="" className="w-20 h-20 rounded-lg mt-2 object-cover" />}</div>
+   178→   178→            <div className="flex items-center gap-2"><input type="checkbox" checked={form.isActive} onChange={(e) => setForm(p => ({ ...p, isActive: e.target.checked }))} className="w-4 h-4 accent-primary" /><label className="text-sm font-medium text-gray-700">Active</label></div>
+   179→   179→          </div>
+   180→   180→          <div className="flex gap-3 mt-4"><button onClick={() => saveMutation.mutate(form)} disabled={saveMutation.isPending} className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{saveMutation.isPending ? 'Saving...' : 'Save'}</button><button onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button></div>
+   181→   181→        </div>
+   182→   182→      )}
+   183→   183→
+   184→   184→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   185→   185→        <div className="overflow-x-auto">
+   186→   186→          <table className="w-full">
+   187→   187→            <thead className="bg-gray-50 border-b border-gray-200"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Image</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">City</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   188→   188→            <tbody className="divide-y divide-gray-100">
+   189→   189→              {restaurants.map((r: any) => (
+   190→   190→                <tr key={r.id} className="hover:bg-gray-50">
+   191→   191→                  <td className="px-4 py-3">{r.image ? <img src={r.image} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center"><Store className="w-5 h-5 text-orange-400" /></div>}</td>
+   192→   192→                  <td className="px-4 py-3 font-medium text-gray-900">{r.name}</td>
+   193→   193→                  <td className="px-4 py-3 text-sm text-gray-500">{r.category?.name}</td>
+   194→   194→                  <td className="px-4 py-3 text-sm text-gray-500">{r.city || '-'}</td>
+   195→   195→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${r.isActive ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{r.isActive ? 'Active' : 'Inactive'}</span></td>
+   196→   196→                  <td className="px-4 py-3"><div className="flex gap-2"><button onClick={() => handleEdit(r)} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Edit className="w-4 h-4" /></button><button onClick={() => confirm('Delete?') && deleteMutation.mutate(r.id)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div></td>
+   197→   197→                </tr>
+   198→   198→              ))}
+   199→   199→            </tbody>
+   200→   200→          </table>
+   201→   201→        </div>
+   202→   202→      </div>
+   203→   203→    </div>
+   204→   204→  );
+   205→   205→}
+   206→   206→
+   207→   207→// ─── FOODS ──────────────────────────
+   208→   208→function AdminFoods() {
+   209→   209→  const qc = useQueryClient();
+   210→   210→  const [showForm, setShowForm] = useState(false);
+   211→   211→  const [editItem, setEditItem] = useState<any>(null);
+   212→   212→  const [search, setSearch] = useState('');
+   213→   213→  const [form, setForm] = useState({ name: '', description: '', price: '', categoryId: '', restaurantId: '', image: '', isAvailable: true });
+   214→   214→
+   215→   215→  const { data: foods = [] } = useQuery({ queryKey: ['foods-admin', search], queryFn: () => fetch(`/api/foods${search ? `?search=${search}` : ''}`).then(r => r.json()).then(d => d.data || []) });
+   216→   216→  const { data: categories = [] } = useQuery({ queryKey: ['categories'], queryFn: () => fetch('/api/categories').then(r => r.json()).then(d => d.data || []) });
+   217→   217→  const { data: restaurants = [] } = useQuery({ queryKey: ['restaurants-list'], queryFn: () => fetch('/api/restaurants').then(r => r.json()).then(d => d.data || []) });
+   218→   218→
+   219→   219→  const saveMutation = useMutation({
+   220→   220→    mutationFn: (data: any) => fetch('/api/foods', { method: editItem ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(editItem ? { ...data, id: editItem.id } : data) }).then(r => r.json()),
+   221→   221→    onSuccess: () => { toast.success(editItem ? 'Food updated' : 'Food created'); setShowForm(false); setEditItem(null); qc.invalidateQueries({ queryKey: ['foods-admin'] }); },
+   222→   222→  });
+   223→   223→
+   224→   224→  const deleteMutation = useMutation({
+   225→   225→    mutationFn: (id: string) => fetch(`/api/foods?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+   226→   226→    onSuccess: () => { toast.success('Food deleted'); qc.invalidateQueries({ queryKey: ['foods-admin'] }); },
+   227→   227→  });
+   228→   228→
+   229→   229→  const toggleMutation = useMutation({
+   230→   230→    mutationFn: ({ id, isAvailable }: { id: string; isAvailable: boolean }) => fetch('/api/foods', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, isAvailable }) }).then(r => r.json()),
+   231→   231→    onSuccess: () => qc.invalidateQueries({ queryKey: ['foods-admin'] }),
+   232→   232→  });
+   233→   233→
+   234→   234→  const handleEdit = (f: any) => { setEditItem(f); setForm({ name: f.name, description: f.description || '', price: String(f.price), categoryId: f.categoryId || f.category?.id || '', restaurantId: f.restaurantId || f.restaurant?.id || '', image: f.image || '', isAvailable: f.isAvailable }); setShowForm(true); };
+   235→   235→  const handleUpload = async (e: any) => { const file = e.target.files[0]; if (!file) return; const fd = new FormData(); fd.append('file', file); const res = await fetch('/api/upload', { method: 'POST', body: fd }); const data = await res.json(); if (data.data?.url) setForm(p => ({ ...p, image: data.data.url })); };
+   236→   236→
+   237→   237→  return (
+   238→   238→    <div>
+   239→   239→      <div className="flex justify-between items-center mb-6">
+   240→   240→        <h2 className="text-2xl font-bold text-gray-900">Food Menu</h2>
+   241→   241→        <button onClick={() => { setEditItem(null); setForm({ name: '', description: '', price: '', categoryId: '', restaurantId: '', image: '', isAvailable: true }); setShowForm(true); }} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-orange-600"><Plus className="w-4 h-4" /> Add Food</button>
+   242→   242→      </div>
+   243→   243→
+   244→   244→      <div className="relative mb-4 max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" /><input type="text" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search foods..." className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   245→   245→
+   246→   246→      {showForm && (
+   247→   247→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6">
+   248→   248→          <h3 className="font-semibold text-lg mb-4">{editItem ? 'Edit Food' : 'New Food'}</h3>
+   249→   249→          <div className="grid md:grid-cols-2 gap-4">
+   250→   250→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Name *</label><input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   251→   251→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Price (₦) *</label><input type="number" value={form.price} onChange={(e) => setForm(p => ({ ...p, price: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   252→   252→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Category *</label><select value={form.categoryId} onChange={(e) => setForm(p => ({ ...p, categoryId: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"><option value="">Select</option>{categories.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
+   253→   253→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Restaurant *</label><select value={form.restaurantId} onChange={(e) => setForm(p => ({ ...p, restaurantId: e.target.value }))} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none"><option value="">Select</option>{restaurants.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}</select></div>
+   254→   254→            <div className="md:col-span-2"><label className="block text-sm font-medium text-gray-700 mb-1">Description</label><textarea value={form.description} onChange={(e) => setForm(p => ({ ...p, description: e.target.value }))} rows={2} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:border-primary outline-none" /></div>
+   255→   255→            <div><label className="block text-sm font-medium text-gray-700 mb-1">Image</label><input type="file" accept="image/*" onChange={handleUpload} className="w-full" />{form.image && <img src={form.image} alt="" className="w-20 h-20 rounded-lg mt-2 object-cover" />}</div>
+   256→   256→            <div className="flex items-center gap-2 pt-6"><input type="checkbox" checked={form.isAvailable} onChange={(e) => setForm(p => ({ ...p, isAvailable: e.target.checked }))} className="w-4 h-4 accent-primary" /><label className="text-sm font-medium text-gray-700">Available</label></div>
+   257→   257→          </div>
+   258→   258→          <div className="flex gap-3 mt-4"><button onClick={() => saveMutation.mutate({ ...form, price: Number(form.price) })} disabled={saveMutation.isPending} className="px-6 py-2.5 bg-primary text-white rounded-lg hover:bg-orange-600 disabled:opacity-50">{saveMutation.isPending ? 'Saving...' : 'Save'}</button><button onClick={() => setShowForm(false)} className="px-6 py-2.5 border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button></div>
+   259→   259→        </div>
+   260→   260→      )}
+   261→   261→
+   262→   262→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   263→   263→        <div className="overflow-x-auto">
+   264→   264→          <table className="w-full">
+   265→   265→            <thead className="bg-gray-50 border-b border-gray-200"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Image</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Category</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Restaurant</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Price</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Available</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   266→   266→            <tbody className="divide-y divide-gray-100">
+   267→   267→              {foods.map((f: any) => (
+   268→   268→                <tr key={f.id} className="hover:bg-gray-50">
+   269→   269→                  <td className="px-4 py-3">{f.image ? <img src={f.image} alt="" className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center text-lg">🍽️</div>}</td>
+   270→   270→                  <td className="px-4 py-3 font-medium text-gray-900">{f.name}</td>
+   271→   271→                  <td className="px-4 py-3 text-sm text-gray-500">{f.category?.name}</td>
+   272→   272→                  <td className="px-4 py-3 text-sm text-gray-500">{f.restaurant?.name}</td>
+   273→   273→                  <td className="px-4 py-3 font-semibold">{formatNaira(f.price)}</td>
+   274→   274→                  <td className="px-4 py-3"><button onClick={() => toggleMutation.mutate({ id: f.id, isAvailable: !f.isAvailable })} className={`px-2 py-0.5 rounded-full text-xs font-medium ${f.isAvailable ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{f.isAvailable ? 'Yes' : 'No'}</button></td>
+   275→   275→                  <td className="px-4 py-3"><div className="flex gap-2"><button onClick={() => handleEdit(f)} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Edit className="w-4 h-4" /></button><button onClick={() => confirm('Delete?') && deleteMutation.mutate(f.id)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div></td>
+   276→   276→                </tr>
+   277→   277→              ))}
+   278→   278→            </tbody>
+   279→   279→          </table>
+   280→   280→        </div>
+   281→   281→      </div>
+   282→   282→    </div>
+   283→   283→  );
+   284→   284→}
+   285→   285→
+   286→   286→// ─── ORDERS ──────────────────────────
+   287→   287→function AdminOrders() {
+   288→   288→  const qc = useQueryClient();
+   289→   289→  const [statusFilter, setStatusFilter] = useState('');
+   290→   290→  const [viewOrder, setViewOrder] = useState<any>(null);
+   291→   291→
+   292→   292→  const { data: orders = [], isLoading } = useQuery({
+   293→   293→    queryKey: ['orders-admin', statusFilter],
+   294→   294→    queryFn: () => fetch(`/api/orders${statusFilter ? `?status=${statusFilter}` : ''}`).then(r => r.json()).then(d => d.data || []),
+   295→   295→  });
+   296→   296→
+   297→   297→  const updateStatus = useMutation({
+   298→   298→    mutationFn: ({ id, status, remark }: { id: string; status: string; remark?: string }) => fetch('/api/orders', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status, remark }) }).then(r => r.json()),
+   299→   299→    onSuccess: () => { toast.success('Order status updated'); qc.invalidateQueries({ queryKey: ['orders-admin'] }); setViewOrder(null); },
+   300→   300→  });
+   301→   301→
+   302→   302→  const deleteMutation = useMutation({
+   303→   303→    mutationFn: (id: string) => fetch(`/api/orders?id=${id}`, { method: 'DELETE' }).then(r => r.json()),
+   304→   304→    onSuccess: () => { toast.success('Order deleted'); qc.invalidateQueries({ queryKey: ['orders-admin'] }); },
+   305→   305→  });
+   306→   306→
+   307→   307→  if (viewOrder) {
+   308→   308→    return (
+   309→   309→      <div>
+   310→   310→        <button onClick={() => setViewOrder(null)} className="flex items-center gap-2 text-gray-600 hover:text-primary mb-4"><ArrowLeft className="w-4 h-4" /> Back</button>
+   311→   311→        <div className="bg-white rounded-xl shadow-sm p-6">
+   312→   312→          <div className="flex justify-between items-start mb-4">
+   313→   313→            <div><h2 className="text-xl font-bold">{viewOrder.orderNumber}</h2><p className="text-gray-500 text-sm">{new Date(viewOrder.createdAt).toLocaleString()}</p></div>
+   314→   314→            <StatusBadge status={viewOrder.status} />
+   315→   315→          </div>
+   316→   316→          <div className="grid md:grid-cols-2 gap-4 mb-4">
+   317→   317→            <div className="bg-gray-50 rounded-lg p-3"><h4 className="font-semibold text-sm mb-1">Customer</h4><p className="text-sm">{viewOrder.customerName}</p><p className="text-sm text-gray-500">{viewOrder.customerPhone}</p><p className="text-sm text-gray-500">{viewOrder.deliveryAddress}, {viewOrder.deliveryCity}</p></div>
+   318→   318→            <div className="bg-gray-50 rounded-lg p-3"><h4 className="font-semibold text-sm mb-1">Payment</h4><p className="text-sm">{viewOrder.paymentMethod === 'PAYSTACK' ? 'Paystack' : 'Cash on Delivery'}</p><p className="text-sm"><span className={viewOrder.paymentStatus === 'PAID' ? 'text-green-600 font-semibold' : 'text-yellow-600'}>{viewOrder.paymentStatus}</span></p><p className="text-lg font-bold mt-1">{formatNaira(viewOrder.totalAmount)}</p></div>
+   319→   319→          </div>
+   320→   320→          <h4 className="font-semibold text-sm mb-2">Items</h4>
+   321→   321→          <div className="space-y-1 mb-4">
+   322→   322→            {viewOrder.items?.map((item: any) => (
+   323→   323→              <div key={item.id} className="flex justify-between text-sm bg-gray-50 p-2 rounded"><span>{item.foodName} × {item.quantity}</span><span className="font-medium">{formatNaira(item.totalPrice)}</span></div>
+   324→   324→            ))}
+   325→   325→          </div>
+   326→   326→          <div className="border-t pt-4">
+   327→   327→            <h4 className="font-semibold text-sm mb-2">Update Status</h4>
+   328→   328→            <div className="flex gap-2 flex-wrap">
+   329→   329→              {['CONFIRMED', 'PREPARING', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'].map(s => (
+   330→   330→                <button key={s} onClick={() => updateStatus.mutate({ id: viewOrder.id, status: s })} disabled={updateStatus.isPending} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${s === 'CANCELLED' ? 'bg-red-50 text-red-600 hover:bg-red-100' : s === 'DELIVERED' ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}>
+   331→   331→                  {s.replace(/_/g, ' ')}
+   332→   332→                </button>
+   333→   333→              ))}
+   334→   334→            </div>
+   335→   335→          </div>
+   336→   336→        </div>
+   337→   337→      </div>
+   338→   338→    );
+   339→   339→  }
+   340→   340→
+   341→   341→  return (
+   342→   342→    <div>
+   343→   343→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Orders</h2>
+   344→   344→      <div className="flex gap-2 overflow-x-auto scrollbar-hidden pb-4 mb-4">
+   345→   345→        {['', 'PENDING', 'CONFIRMED', 'PREPARING', 'ON_THE_WAY', 'DELIVERED', 'CANCELLED'].map(s => (
+   346→   346→          <button key={s} onClick={() => setStatusFilter(s)} className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap flex-shrink-0 transition-colors ${statusFilter === s ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>{s || 'All'}</button>
+   347→   347→        ))}
+   348→   348→      </div>
+   349→   349→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   350→   350→        <div className="overflow-x-auto">
+   351→   351→          <table className="w-full">
+   352→   352→            <thead className="bg-gray-50 border-b"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Order #</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Customer</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Amount</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Payment</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   353→   353→            <tbody className="divide-y divide-gray-100">
+   354→   354→              {isLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+   355→   355→              : orders.length === 0 ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">No orders found</td></tr>
+   356→   356→              : orders.map((o: any) => (
+   357→   357→                <tr key={o.id} className="hover:bg-gray-50">
+   358→   358→                  <td className="px-4 py-3 font-medium text-sm">{o.orderNumber}</td>
+   359→   359→                  <td className="px-4 py-3 text-sm">{o.customerName || '-'}</td>
+   360→   360→                  <td className="px-4 py-3 font-semibold text-sm">{formatNaira(o.totalAmount)}</td>
+   361→   361→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${o.paymentStatus === 'PAID' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>{o.paymentStatus}</span></td>
+   362→   362→                  <td className="px-4 py-3"><StatusBadge status={o.status} /></td>
+   363→   363→                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(o.createdAt).toLocaleDateString()}</td>
+   364→   364→                  <td className="px-4 py-3"><div className="flex gap-2"><button onClick={() => setViewOrder(o)} className="p-1.5 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100"><Eye className="w-4 h-4" /></button><button onClick={() => confirm('Delete?') && deleteMutation.mutate(o.id)} className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100"><Trash2 className="w-4 h-4" /></button></div></td>
+   365→   365→                </tr>
+   366→   366→              ))}
+   367→   367→            </tbody>
+   368→   368→          </table>
+   369→   369→        </div>
+   370→   370→      </div>
+   371→   371→    </div>
+   372→   372→  );
+   373→   373→}
+   374→   374→
+   375→   375→// ─── CUSTOMERS ──────────────────────────
+   376→   376→function AdminCustomers() {
+   377→   377→  const { data: users = [], isLoading } = useQuery({
+   378→   378→    queryKey: ['users'],
+   379→   379→    queryFn: () => fetch('/api/users').then(r => r.json()).then(d => d.data || []),
+   380→   380→  });
+   381→   381→
+   382→   382→  const blockMutation = useMutation({
+   383→   383→    mutationFn: ({ id, status }: { id: string; status: string }) => fetch('/api/users', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, status }) }).then(r => r.json()),
+   384→   384→    onSuccess: (_, vars) => { toast.success(`User ${vars.status === 'BLOCKED' ? 'blocked' : 'unblocked'}`); },
+   385→   385→  });
+   386→   386→
+   387→   387→  return (
+   388→   388→    <div>
+   389→   389→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Customers</h2>
+   390→   390→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   391→   391→        <div className="overflow-x-auto">
+   392→   392→          <table className="w-full">
+   393→   393→            <thead className="bg-gray-50 border-b"><tr><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Phone</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Role</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Joined</th><th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Actions</th></tr></thead>
+   394→   394→            <tbody className="divide-y divide-gray-100">
+   395→   395→              {isLoading ? <tr><td colSpan={7} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+   396→   396→              : users.map((u: any) => (
+   397→   397→                <tr key={u.id} className="hover:bg-gray-50">
+   398→   398→                  <td className="px-4 py-3 font-medium text-sm">{u.name}</td>
+   399→   399→                  <td className="px-4 py-3 text-sm text-gray-500">{u.email}</td>
+   400→   400→                  <td className="px-4 py-3 text-sm text-gray-500">{u.phone || '-'}</td>
+   401→   401→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.role === 'ADMIN' ? 'bg-orange-100 text-orange-700' : 'bg-gray-100 text-gray-700'}`}>{u.role}</span></td>
+   402→   402→                  <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${u.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{u.status}</span></td>
+   403→   403→                  <td className="px-4 py-3 text-sm text-gray-500">{new Date(u.createdAt).toLocaleDateString()}</td>
+   404→   404→                  <td className="px-4 py-3">{u.role !== 'ADMIN' && <button onClick={() => blockMutation.mutate({ id: u.id, status: u.status === 'ACTIVE' ? 'BLOCKED' : 'ACTIVE' })} className={`px-3 py-1 rounded text-xs font-medium ${u.status === 'ACTIVE' ? 'text-red-600 bg-red-50 hover:bg-red-100' : 'text-green-600 bg-green-50 hover:bg-green-100'}`}>{u.status === 'ACTIVE' ? 'Block' : 'Unblock'}</button>}</td>
+   405→   405→                </tr>
+   406→   406→              ))}
+   407→   407→            </tbody>
+   408→   408→          </table>
+   409→   409→        </div>
+   410→   410→      </div>
+   411→   411→    </div>
+   412→   412→  );
+   413→   413→}
+   414→   414→
+   415→   415→// ─── EARNINGS ──────────────────────────
+   416→   416→function AdminEarnings() {
+   417→   417→  const { data, isLoading } = useQuery({
+   418→   418→    queryKey: ['earnings'],
+   419→   419→    queryFn: () => fetch('/api/dashboard/earnings?period=all').then(r => r.json()).then(d => d.data),
+   420→   420→  });
+   421→   421→
+   422→   422→  return (
+   423→   423→    <div>
+   424→   424→      <h2 className="text-2xl font-bold text-gray-900 mb-6">Earnings</h2>
+   425→   425→      <div className="grid md:grid-cols-3 gap-4 mb-6">
+   426→   426→        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-emerald-500">
+   427→   427→          <p className="text-sm text-gray-500">Total Earnings</p>
+   428→   428→          <p className="text-2xl font-bold text-gray-900">{formatNaira(data?.totalEarnings || 0)}</p>
+   429→   429→        </div>
+   430→   430→        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-blue-500">
+   431→   431→          <p className="text-sm text-gray-500">Paystack</p>
+   432→   432→          <p className="text-2xl font-bold text-gray-900">{formatNaira(data?.paystackEarnings || 0)}</p>
+   433→   433→        </div>
+   434→   434→        <div className="bg-white rounded-xl shadow-sm p-6 border-l-4 border-l-orange-500">
+   435→   435→          <p className="text-sm text-gray-500">Cash on Delivery</p>
+   436→   436→          <p className="text-2xl font-bold text-gray-900">{formatNaira(data?.codEarnings || 0)}</p>
+   437→   437→        </div>
+   438→   438→      </div>
+   439→   439→      {data?.topRestaurants?.length > 0 && (
+   440→   440→        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   441→   441→          <div className="p-4 border-b"><h3 className="font-semibold">Top Restaurants</h3></div>
+   442→   442→          <table className="w-full"><thead className="bg-gray-50"><tr><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Restaurant</th><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Orders</th><th className="text-left px-4 py-2 text-xs font-semibold text-gray-500">Revenue</th></tr></thead>
+   443→   443→          <tbody className="divide-y">{data.topRestaurants.map((r: any, i: number) => <tr key={i} className="hover:bg-gray-50"><td className="px-4 py-2 text-sm font-medium">{r.name}</td><td className="px-4 py-2 text-sm text-gray-500">{r.orders}</td><td className="px-4 py-2 text-sm font-semibold">{formatNaira(r.revenue)}</td></tr>)}</tbody></table>
+   444→   444→        </div>
+   445→   445→      )}
+   446→   446→    </div>
+   447→   447→  );
+   448→   448→}
+   449→   449→
+   450→   450→// ─── MAIN ADMIN LAYOUT ──────────────────────────
+   451→   451→// ─── RESTAURANT OWNERS ──────────────────
+   452→   452→function AdminOwners() {
+   453→   453→  const qc = useQueryClient();
+   454→   454→  const [showAssign, setShowAssign] = useState(false);
+   455→   455→  const [selectedRestaurant, setSelectedRestaurant] = useState('');
+   456→   456→  const [selectedOwner, setSelectedOwner] = useState('');
+   457→   457→
+   458→   458→  const { data: owners = [], isLoading: loadingOwners } = useQuery({
+   459→   459→    queryKey: ['restaurant-owners'],
+   460→   460→    queryFn: () => fetch('/api/users?role=RESTAURANT_OWNER').then(r => r.json()).then(d => d.data || []),
+   461→   461→  });
+   462→   462→
+   463→   463→  const { data: restaurants = [], isLoading: loadingRestaurants } = useQuery({
+   464→   464→    queryKey: ['restaurants-all'],
+   465→   465→    queryFn: () => fetch('/api/restaurants').then(r => r.json()).then(d => d.data || []),
+   466→   466→  });
+   467→   467→
+   468→   468→  const assignMutation = useMutation({
+   469→   469→    mutationFn: ({ restaurantId, ownerId }: { restaurantId: string; ownerId: string }) =>
+   470→   470→      fetch('/api/restaurants', {
+   471→   471→        method: 'PUT',
+   472→   472→        headers: { 'Content-Type': 'application/json' },
+   473→   473→        body: JSON.stringify({ id: restaurantId, ownerId }),
+   474→   474→      }).then(r => r.json()),
+   475→   475→    onSuccess: () => {
+   476→   476→      toast.success('Owner assigned successfully');
+   477→   477→      qc.invalidateQueries({ queryKey: ['restaurants-all'] });
+   478→   478→      qc.invalidateQueries({ queryKey: ['restaurant-owners'] });
+   479→   479→      setShowAssign(false);
+   480→   480→    },
+   481→   481→    onError: () => toast.error('Failed to assign owner'),
+   482→   482→  });
+   483→   483→
+   484→   484→  // Unassigned restaurants
+   485→   485→  const unassignedRestaurants = restaurants.filter((r: any) => !r.ownerId);
+   486→   486→  // All restaurant owners
+   487→   487→  const ownerUsers = owners;
+   488→   488→
+   489→   489→  return (
+   490→   490→    <div>
+   491→   491→      <div className="flex items-center justify-between mb-6">
+   492→   492→        <h2 className="text-2xl font-bold text-gray-900">Restaurant Owners</h2>
+   493→   493→        <button onClick={() => setShowAssign(!showAssign)} className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-orange-600 transition-colors">
+   494→   494→          <Plus className="w-4 h-4" /> Assign Owner
+   495→   495→        </button>
+   496→   496→      </div>
+   497→   497→
+   498→   498→      {/* Assign Owner Dialog */}
+   499→   499→      {showAssign && (
+   500→   500→        <div className="bg-white rounded-xl shadow-sm p-6 mb-6 border-2 border-orange-200">
+   501→   501→          <h3 className="font-semibold text-lg mb-4">Assign Restaurant Owner</h3>
+   502→   502→          <div className="space-y-4">
+   503→   503→            <div>
+   504→   504→              <label className="block text-sm font-medium text-gray-700 mb-1">Restaurant</label>
+   505→   505→              <select value={selectedRestaurant} onChange={(e) => setSelectedRestaurant(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg">
+   506→   506→                <option value="">Select a restaurant</option>
+   507→   507→                {restaurants.map((r: any) => (
+   508→   508→                  <option key={r.id} value={r.id}>{r.name} {r.ownerId ? '(has owner)' : '(unassigned)'}</option>
+   509→   509→                ))}
+   510→   510→              </select>
+   511→   511→            </div>
+   512→   512→            <div>
+   513→   513→              <label className="block text-sm font-medium text-gray-700 mb-1">Owner User</label>
+   514→   514→              <select value={selectedOwner} onChange={(e) => setSelectedOwner(e.target.value)} className="w-full px-4 py-2.5 border border-gray-300 rounded-lg">
+   515→   515→                <option value="">Select an owner</option>
+   516→   516→                {ownerUsers.map((u: any) => (
+   517→   517→                  <option key={u.id} value={u.id}>{u.name} ({u.email})</option>
+   518→   518→                ))}
+   519→   519→              </select>
+   520→   520→            </div>
+   521→   521→            <div className="flex gap-2">
+   522→   522→              <button onClick={() => { if (selectedRestaurant && selectedOwner) assignMutation.mutate({ restaurantId: selectedRestaurant, ownerId: selectedOwner }); }} disabled={!selectedRestaurant || !selectedOwner || assignMutation.isPending} className="px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium disabled:opacity-50">Assign</button>
+   523→   523→              <button onClick={() => setShowAssign(false)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium">Cancel</button>
+   524→   524→            </div>
+   525→   525→          </div>
+   526→   526→        </div>
+   527→   527→      )}
+   528→   528→
+   529→   529→      {/* Owner List */}
+   530→   530→      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+   531→   531→        <div className="overflow-x-auto">
+   532→   532→          <table className="w-full">
+   533→   533→            <thead className="bg-gray-50 border-b">
+   534→   534→              <tr>
+   535→   535→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Owner</th>
+   536→   536→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Email</th>
+   537→   537→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Phone</th>
+   538→   538→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Restaurant</th>
+   539→   539→                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Status</th>
+   540→   540→              </tr>
+   541→   541→            </thead>
+   542→   542→            <tbody className="divide-y divide-gray-100">
+   543→   543→              {loadingOwners ? (
+   544→   544→                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">Loading...</td></tr>
+   545→   545→              ) : ownerUsers.length === 0 ? (
+   546→   546→                <tr><td colSpan={5} className="px-4 py-8 text-center text-gray-400">No restaurant owners found. Register users with RESTAURANT_OWNER role.</td></tr>
+   547→   547→              ) : ownerUsers.map((owner: any) => {
+   548→   548→                const ownedRestaurants = restaurants.filter((r: any) => r.ownerId === owner.id);
+   549→   549→                return (
+   550→   550→                  <tr key={owner.id} className="hover:bg-gray-50">
+   551→   551→                    <td className="px-4 py-3">
+   552→   552→                      <div className="flex items-center gap-2">
+   553→   553→                        <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+   554→   554→                          <Users className="w-4 h-4 text-emerald-700" />
+   555→   555→                        </div>
+   556→   556→                        <span className="font-medium text-sm">{owner.name}</span>
+   557→   557→                      </div>
+   558→   558→                    </td>
+   559→   559→                    <td className="px-4 py-3 text-sm text-gray-500">{owner.email}</td>
+   560→   560→                    <td className="px-4 py-3 text-sm text-gray-500">{owner.phone || '-'}</td>
+   561→   561→                    <td className="px-4 py-3 text-sm">
+   562→   562→                      {ownedRestaurants.length > 0 ? (
+   563→   563→                        <div className="space-y-1">
+   564→   564→                          {ownedRestaurants.map((r: any) => (
+   565→   565→                            <span key={r.id} className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded text-xs font-medium mr-1">{r.name}</span>
+   566→   566→                          ))}
+   567→   567→                        </div>
+   568→   568→                      ) : (
+   569→   569→                        <span className="text-gray-400">No restaurant assigned</span>
+   570→   570→                      )}
+   571→   571→                    </td>
+   572→   572→                    <td className="px-4 py-3">
+   573→   573→                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${owner.status === 'ACTIVE' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{owner.status}</span>
+   574→   574→                    </td>
+   575→   575→                  </tr>
+   576→   576→                );
+   577→   577→              })}
+   578→   578→            </tbody>
+   579→   579→          </table>
+   580→   580→        </div>
+   581→   581→      </div>
+   582→   582→
+   583→   583→      {/* Unassigned Restaurants */}
+   584→   584→      {unassignedRestaurants.length > 0 && (
+   585→   585→        <div className="mt-6">
+   586→   586→          <h3 className="text-lg font-semibold text-gray-900 mb-3">Unassigned Restaurants</h3>
+   587→   587→          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+   588→   588→            {unassignedRestaurants.map((r: any) => (
+   589→   589→              <div key={r.id} className="bg-white rounded-lg shadow-sm p-4 flex items-center justify-between">
+   590→   590→                <div className="flex items-center gap-3">
+   591→   591→                  {r.image ? <img src={r.image} alt={r.name} className="w-10 h-10 rounded-lg object-cover" /> : <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center"><Store className="w-5 h-5 text-orange-600" /></div>}
+   592→   592→                  <div><p className="font-medium text-sm">{r.name}</p><p className="text-xs text-gray-500">{r.city || 'No city'}</p></div>
+   593→   593→                </div>
+   594→   594→                <button onClick={() => { setSelectedRestaurant(r.id); setShowAssign(true); }} className="px-3 py-1.5 text-xs font-medium text-primary bg-primary/10 rounded-lg hover:bg-primary/20">Assign Owner</button>
+   595→   595→              </div>
+   596→   596→            ))}
+   597→   597→          </div>
+   598→   598→        </div>
+   599→   599→      )}
+   600→   600→    </div>
+   601→   601→  );
+   602→   602→}
+   603→   603→
+   604→   604→export function AdminLayout() {
+   605→   605→  const { isAdmin, isAuthenticated } = useAuth();
+   606→   606→  const { setActiveSection } = useNavigationStore();
+   607→   607→  const { adminSection, setAdminSection } = useNavigationStore();
+   608→   608→
+   609→   609→  if (!isAuthenticated || !isAdmin) {
+   610→   610→    return (
+   611→   611→      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+   612→   612→        <div className="text-center">
+   613→   613→          <XCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
+   614→   614→          <h2 className="text-xl font-semibold text-gray-600 mb-2">Access Denied</h2>
+   615→   615→          <p className="text-gray-400 text-sm mb-4">You need admin access to view this page</p>
+   616→   616→          <button onClick={() => setActiveSection('home')} className="px-6 py-2.5 bg-primary text-white rounded-lg">Go Home</button>
+   617→   617→        </div>
+   618→   618→      </div>
+   619→   619→    );
+   620→   620→  }
+   621→   621→
+   622→   622→  const section = adminSection || 'dashboard';
+   623→   623→
+   624→   624→  const renderContent = () => {
+   625→   625→    switch (section) {
+   626→   626→      case 'dashboard': return <AdminDashboard />;
+   627→   627→      case 'categories': return <AdminCategories />;
+   628→   628→      case 'restaurants': return <AdminRestaurants />;
+   629→   629→      case 'foods': return <AdminFoods />;
+   630→   630→      case 'orders': return <AdminOrders />;
+   631→   631→      case 'customers': return <AdminCustomers />;
+   632→   632→      case 'earnings': return <AdminEarnings />;
+   633→   633→      case 'owners': return <AdminOwners />;
+   634→   634→      default: return <AdminDashboard />;
+   635→   635→    }
+   636→   636→  };
+   637→   637→
+   638→   638→  return (
+   639→   639→    <div className="min-h-screen flex">
+   640→   640→      {/* Sidebar */}
+   641→   641→      <aside className="w-64 bg-orange-600 text-orange-50 flex-shrink-0 fixed h-full overflow-y-auto">
+   642→   642→        <div className="p-6">
+   643→   643→          <button onClick={() => setActiveSection('home')} className="flex items-center gap-2 mb-8">
+   644→   644→            <div className="w-8 h-8 bg-white/20 rounded-lg flex items-center justify-center"><UtensilsCrossed className="w-5 h-5 text-white" /></div>
+   645→   645→            <span className="text-lg font-bold">NaijaBites</span>
+   646→   646→          </button>
+   647→   647→          <nav className="space-y-1">
+   648→   648→            {adminNav.map((item) => (
+   649→   649→              <button
+   650→   650→                key={item.key}
+   651→   651→                onClick={() => setAdminSection(item.key)}
+   652→   652→                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${section === item.key ? 'bg-orange-700 text-white' : 'hover:bg-orange-700/50'}`}
+   653→   653→              >
+   654→   654→                <item.icon className="w-5 h-5" /> {item.label}
+   655→   655→              </button>
+   656→   656→            ))}
+   657→   657→          </nav>
+   658→   658→        </div>
+   659→   659→        <div className="p-6 mt-auto">
+   660→   660→          <button onClick={() => setActiveSection('home')} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-orange-200 hover:bg-orange-700/50 transition-colors">
+   661→   661→            <ArrowLeft className="w-5 h-5" /> Back to Store
+   662→   662→          </button>
+   663→   663→        </div>
+   664→   664→      </aside>
+   665→   665→
+   666→   666→      {/* Content */}
+   667→   667→      <main className="flex-1 ml-64 bg-gray-50 min-h-screen p-6">
+   668→   668→        {renderContent()}
+   669→   669→      </main>
+   670→   670→    </div>
+   671→   671→  );
+   672→   672→}
+   673→   673→

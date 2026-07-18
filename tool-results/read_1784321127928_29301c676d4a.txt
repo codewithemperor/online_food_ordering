@@ -1,0 +1,800 @@
+     1→# Admin Panel Features Planning
+     2→
+     3→## 1. Admin Panel Overview
+     4→
+     5→### 1.1 Access Control
+     6→- Admin panel is a section within the single-page app (NOT a separate route)
+     7→- Toggle between customer view and admin view via header dropdown
+     8→- Only users with `role: ADMIN` can access admin features
+     9→- Non-admin users see "Access Denied" if they somehow navigate to admin section
+    10→- Server-side: All admin API routes check `isAdmin()` before processing
+    11→
+    12→### 1.2 Admin Layout
+    13→**Design Reference:** Bentilzone admin layout (full-screen, orange sidebar) + Methuen admin dashboard
+    14→
+    15→**Layout:**
+    16→```
+    17→AdminLayout
+    18→├── AdminSidebar (left, w-64, bg-orange-600, fixed)
+    19→│   ├── Logo ("NaijaBites Admin")
+    20→│   ├── NavigationMenu
+    21→│   │   ├── Dashboard (Home icon)
+    22→│   │   ├── Restaurants (Store icon)
+    23→│   │   ├── Categories (Tag icon)
+    24→│   │   ├── Food Menu (Utensils icon)
+    25→│   │   ├── Orders (ShoppingCart icon)
+    26→│   │   ├── Customers (Users icon)
+    27→│   │   └── Earnings (DollarSign icon)
+    28→│   └── LogoutButton
+    29→├── AdminContent (right, flex-1, bg-gray-50, ml-64)
+    30→│   ├── ContentHeader (breadcrumb + action buttons)
+    31→│   └── ContentBody (scrollable, p-6)
+    32→│       └── [Active Admin Section]
+    33→└── BackToStoreButton (top-right, "← Back to Store")
+    34→```
+    35→
+    36→**Sidebar Design:**
+    37→- Background: `bg-orange-600`
+    38→- Text: `text-orange-50`
+    39→- Active item: `bg-orange-700 rounded-md`
+    40→- Hover: `bg-orange-700/50 rounded-md`
+    41→- Icons: Lucide icons, `text-xl`
+    42→- Count badges: Red circle with white text (for orders, users)
+    43→- Fixed position, full height
+    44→
+    45→**Content Area Design:**
+    46→- Background: `bg-gray-50`
+    47→- Header: `border-b border-orange-200 py-4 px-6`
+    48→- Body: Scrollable with padding
+    49→- Max-width: None (full-width content)
+    50→
+    51→---
+    52→
+    53→## 2. Admin Dashboard
+    54→
+    55→### 2.1 Dashboard Stats Cards
+    56→**Design Reference:** Methuen admin dashboard + Pizza Fiesta
+    57→
+    58→**Layout:**
+    59→- 4-column grid (desktop), 2-column (tablet), 1-column (mobile)
+    60→- Each stat card: Icon + Title + Value + Trend indicator
+    61→
+    62→**Stat Cards:**
+    63→
+    64→| Card | Icon | Color | Data Source |
+    65→|------|------|-------|-------------|
+    66→| Total Restaurants | Store | orange-500 | `count(Restaurant)` |
+    67→| Total Food Items | Utensils | blue-500 | `count(Food)` |
+    68→| Total Customers | Users | green-500 | `count(User where role=CUSTOMER)` |
+    69→| Total Orders | ShoppingCart | purple-500 | `count(Order)` |
+    70→| Pending Orders | Clock | yellow-500 | `count(Order where status=PENDING)` |
+    71→| Today's Orders | Calendar | indigo-500 | `count(Order where createdAt=today)` |
+    72→| Total Earnings | DollarSign | emerald-500 | `sum(Order.totalAmount where paymentStatus=PAID)` |
+    73→| Cancelled Orders | XCircle | red-500 | `count(Order where status=CANCELLED)` |
+    74→
+    75→**Card Design:**
+    76→```
+    77→StatCard
+    78→├── CardContainer (bg-white, rounded-xl, shadow-sm, p-6, border-l-4 [color])
+    79→│   ├── IconContainer (w-12 h-12, rounded-lg, bg-[color]-50, [color]-500 icon)
+    80→│   ├── StatTitle (text-sm, text-gray-500)
+    81→│   ├── StatValue (text-3xl, font-bold, text-gray-900)
+    82→│   └── StatTrend (text-xs)
+    83→│       ├── Up trend: "↑ 12% from yesterday" (green)
+    84→│       └── Down trend: "↓ 5% from yesterday" (red)
+    85→```
+    86→
+    87→**API:** `GET /api/dashboard/stats`
+    88→
+    89→### 2.2 Recent Orders Table
+    90→- 5 most recent orders
+    91→- Columns: Order #, Customer, Items, Amount, Status, Date
+    92→- "View All" link to Orders section
+    93→- Status badges with color coding
+    94→
+    95→### 2.3 Revenue Chart
+    96→- Simple bar chart showing last 7 days revenue
+    97→- Using lightweight chart (CSS-based or recharts)
+    98→- NGN amounts on Y-axis
+    99→- Days on X-axis
+   100→
+   101→---
+   102→
+   103→## 3. Restaurant Management
+   104→
+   105→### 3.1 Restaurant List
+   106→**Layout:**
+   107→- Section header: "Restaurants" + "Add Restaurant" button
+   108→- Search bar + Category filter
+   109→- Data table with all restaurants
+   110→
+   111→**Table Columns:**
+   112→| Column | Width | Content |
+   113→|--------|-------|---------|
+   114→| Image | 60px | Thumbnail (w-10 h-10, rounded) |
+   115→| Name | — | Restaurant name |
+   116→| Category | 120px | Category badge |
+   117→| Email | 180px | Email (truncated) |
+   118→| Phone | 120px | Phone number |
+   119→| City | 100px | City |
+   120→| Status | 80px | Active/Inactive badge |
+   121→| Actions | 100px | Edit + Delete buttons |
+   122→
+   123→**Components:**
+   124→```
+   125→AdminRestaurants
+   126→├── ContentHeader ("Restaurants" + AddButton)
+   127→├── FilterBar (Search + CategoryFilter)
+   128→└── RestaurantsTable (HeroUI Table)
+   129→    ├── TableHeader
+   130→    └── TableRows
+   131→        └── RestaurantRow (image, name, category, email, phone, city, status, actions)
+   132→```
+   133→
+   134→### 3.2 Add/Edit Restaurant Form
+   135→**Design Reference:** Methuen add_restaurant.php
+   136→
+   137→**Layout:**
+   138→- HeroUI Modal or inline form
+   139→- Two-column layout where applicable
+   140→
+   141→**Form Fields:**
+   142→
+   143→| Field | Type | Validation | Notes |
+   144→|-------|------|------------|-------|
+   145→| Restaurant Name | Input | Required, min 3 chars | |
+   146→| Category | Select | Required | Dropdown from categories |
+   147→| Email | Input | Valid email format | Optional |
+   148→| Phone | Input | Valid Nigerian phone | Optional |
+   149→| Address | Textarea | Required, min 10 chars | |
+   150→| City | Select | Required | Nigerian cities list |
+   151→| State | Select | Required | Nigerian states list |
+   152→| Opening Time | Input (time) | Required | e.g. 08:00 |
+   153→| Closing Time | Input (time) | Required | e.g. 22:00 |
+   154→| Open Days | Input | Required | e.g. "Mon-Sat" |
+   155→| Image | FileUpload | jpg/png/webp, max 2MB | Preview before upload |
+   156→| isActive | Switch | Default: true | Toggle active status |
+   157→
+   158→**Image Upload:**
+   159→- Click to upload or drag & drop
+   160→- Preview thumbnail
+   161→- Delete/remove uploaded image
+   162→- Upload to `/api/upload` → Returns URL
+   163→
+   164→**Edge Cases:**
+   165→- Restaurant name already exists → Show error
+   166→- Closing time before opening time → Show validation error
+   167→- Image upload fails → Show error, allow retry
+   168→- Category deleted while form is open → Refresh categories
+   169→
+   170→### 3.3 Delete Restaurant
+   171→- Confirmation modal: "Are you sure? All associated food items will also be deleted."
+   172→- Warning: "This action cannot be undone"
+   173→- On confirm: DELETE `/api/restaurants?id=X`
+   174→- Cascade delete: All foods under this restaurant are deleted
+   175→- Orders referencing this restaurant are NOT deleted (they have snapshots)
+   176→- Show toast: "Restaurant deleted successfully"
+   177→
+   178→**Edge Cases:**
+   179→- Restaurant has active orders → Warn: "This restaurant has X active orders. Delete anyway?"
+   180→- Delete fails → Show error toast
+   181→- Multiple delete clicks → Debounce, show loading state
+   182→
+   183→---
+   184→
+   185→## 4. Food Category Management
+   186→
+   187→### 4.1 Category List
+   188→**Layout:**
+   189→- Section header: "Food Categories" + "Add Category" button
+   190→- Grid of category cards (3-column)
+   191→
+   192→**Category Card Design:**
+   193→```
+   194→CategoryCard
+   195→├── CardContainer (bg-white, rounded-lg, shadow-sm, overflow-hidden)
+   196→│   ├── CategoryImage (h-32, w-full, object-cover)
+   197→│   ├── CategoryInfo (p-4)
+   198→│   │   ├── CategoryName (font-semibold)
+   199→│   │   ├── FoodCount ("X food items" badge)
+   200→│   │   └── RestaurantCount ("X restaurants" badge)
+   201→│   └── CardActions (flex, border-t)
+   202→│       ├── EditButton (flex-1, text-center, hover:bg-gray-50)
+   203→│       └── DeleteButton (flex-1, text-center, hover:bg-red-50, text-red-600)
+   204→```
+   205→
+   206→### 4.2 Add/Edit Category Form
+   207→**Fields:**
+   208→
+   209→| Field | Type | Validation | Notes |
+   210→|-------|------|------------|-------|
+   211→| Category Name | Input | Required, unique | e.g. "Nigerian", "Continental", "Chinese" |
+   212→| Description | Textarea | Optional | Brief description |
+   213→| Image | FileUpload | jpg/png/webp, max 2MB | Category cover image |
+   214→
+   215→**Default Categories (Seed Data):**
+   216→1. Nigerian (Local dishes: jollof, egusi, suya, etc.)
+   217→2. Continental (Western dishes)
+   218→3. Chinese (Asian cuisine)
+   219→4. Fast Food (Burgers, pizza, etc.)
+   220→5. Drinks & Beverages
+   221→6. Desserts & Snacks
+   222→
+   223→### 4.3 Delete Category
+   224→- Confirmation modal with warning about cascade delete
+   225→- Deleting a category deletes all restaurants and foods in that category
+   226→- Warning: "X restaurants and Y food items will be permanently deleted"
+   227→- Cannot delete the last category (minimum 1 required)
+   228→
+   229→**Edge Cases:**
+   230→- Category has restaurants → Show count in delete confirmation
+   231→- Category has foods → Show count in delete confirmation
+   232→- Only one category left → Disable delete button, show tooltip
+   233→- Category name already exists on edit → Show error
+   234→
+   235→---
+   236→
+   237→## 5. Food Menu Management
+   238→
+   239→### 5.1 Food Items List
+   240→**Layout:**
+   241→- Section header: "Food Menu" + "Add Food Item" button
+   242→- Search bar + Category filter + Restaurant filter + Availability filter
+   243→- Data table or card grid
+   244→
+   245→**Table Columns:**
+   246→| Column | Width | Content |
+   247→|--------|-------|---------|
+   248→| Image | 60px | Thumbnail (rounded) |
+   249→| Name | — | Food name |
+   250→| Category | 120px | Category badge |
+   251→| Restaurant | 150px | Restaurant name |
+   252→| Price | 100px | ₦ amount |
+   253→| Available | 80px | Yes/No badge (green/red) |
+   254→| Actions | 100px | Edit + Delete + Toggle Availability |
+   255→
+   256→### 5.2 Add/Edit Food Item Form
+   257→**Design Reference:** Pizza Fiesta MenuItemForm + Methuen add_menu.php
+   258→
+   259→**Form Fields:**
+   260→
+   261→| Field | Type | Validation | Notes |
+   262→|-------|------|------------|-------|
+   263→| Food Name | Input | Required, min 2 chars | |
+   264→| Description | Textarea | Optional | Food description |
+   265→| Category | Select | Required | Dropdown from categories |
+   266→| Restaurant | Select | Required | Dropdown from restaurants (filtered by category?) |
+   267→| Base Price (₦) | NumberInput | Required, min 0 | Nigerian Naira amount |
+   268→| Image | FileUpload | jpg/png/webp, max 2MB | Food photo |
+   269→| Is Available | Switch | Default: true | Toggle availability |
+   270→
+   271→**Price Input:**
+   272→- Prefix: ₦ symbol (red)
+   273→- Number format with comma separators
+   274→- Step: 100 (minimum increment ₦100)
+   275→- Min: 0
+   276→
+   277→**Category-Restaurant Linkage:**
+   278→- When category is selected, restaurant dropdown filters to restaurants in that category
+   279→- If no restaurants in category, show "Add a restaurant first" message
+   280→
+   281→### 5.3 Toggle Availability
+   282→- Quick toggle in the table row
+   283→- Switch component: Available (green) ↔ Unavailable (gray)
+   284→- No confirmation needed (reversible action)
+   285→- Shows toast: "Jollof Rice is now available/unavailable"
+   286→
+   287→### 5.4 Delete Food Item
+   288→- Confirmation modal
+   289→- Warning: "This food item will be permanently deleted"
+   290→- Note: Existing orders with this food item will NOT be affected (they store snapshots)
+   291→- On confirm: DELETE `/api/foods?id=X`
+   292→
+   293→**Edge Cases:**
+   294→- Food is in active orders → "This item is in X active orders. The orders will not be affected."
+   295→- Food image fails to delete → Log error, still delete food record
+   296→- Price is 0 → Show warning "Are you sure this item is free?"
+   297→
+   298→---
+   299→
+   300→## 6. Order Management
+   301→
+   302→### 6.1 Orders List
+   303→**Layout:**
+   304→- Section header: "Manage Orders"
+   305→- Filter tabs: All, Pending, Confirmed, Preparing, On the Way, Delivered, Cancelled
+   306→- Search by order number or customer name
+   307→- Date range filter
+   308→- Data table
+   309→
+   310→**Table Columns:**
+   311→| Column | Width | Content |
+   312→|--------|-------|---------|
+   313→| Order # | 120px | Order number (clickable, opens detail) |
+   314→| Customer | 150px | Name + Email |
+   315→| Items | — | Comma-separated food names (truncated) |
+   316→| Restaurant | 120px | Restaurant name |
+   317→| Amount | 100px | ₦ total |
+   318→| Payment | 80px | Paid/Pending badge |
+   319→| Status | 120px | Status badge (color-coded) |
+   320→| Date | 120px | Formatted date |
+   321→| Actions | 150px | View + Update Status + Delete |
+   322→
+   323→**Status Badge Colors (Admin):**
+   324→| Status | Background | Text | Icon |
+   325→|--------|-----------|------|------|
+   326→| PENDING | blue-100 | blue-700 | Clock |
+   327→| CONFIRMED | indigo-100 | indigo-700 | CheckCircle |
+   328→| PREPARING | yellow-100 | yellow-700 | ChefHat |
+   329→| ON_THE_WAY | orange-100 | orange-700 | Truck |
+   330→| DELIVERED | green-100 | green-700 | CheckCheck |
+   331→| CANCELLED | red-100 | red-700 | XCircle |
+   332→
+   333→### 6.2 Order Detail View
+   334→**Design Reference:** Methuen view_order.php + Pizza Fiesta order detail
+   335→
+   336→**Layout:**
+   337→- Full section view (replaces table)
+   338→- Back button to orders list
+   339→- Order information sections
+   340→
+   341→**Sections:**
+   342→```
+   343→OrderDetailView
+   344→├── OrderHeader
+   345→│   ├── OrderNumber
+   346→│   ├── OrderDate
+   347→│   ├── StatusBadge (large)
+   348→│   └── QuickActions (Update Status dropdown)
+   349→├── OrderInfo (2-column grid)
+   350→│   ├── CustomerInfo
+   351→│   │   ├── CustomerName
+   352→│   │   ├── CustomerEmail
+   353→│   │   ├── CustomerPhone
+   354→│   │   └── DeliveryAddress
+   355→│   ├── PaymentInfo
+   356→│   │   ├── PaymentMethod (Paystack/COD)
+   357→│   │   ├── PaymentStatus
+   358→│   │   ├── TransactionRef (if Paystack)
+   359→│   │   └── TotalAmount
+   360→│   └── RestaurantInfo
+   361→│       ├── RestaurantName
+   362→│       └── RestaurantAddress
+   363→├── OrderItems (table)
+   364→│   ├── ItemRow (image, name, qty, unit price, total) × N
+   365→│   └── OrderTotals
+   366→│       ├── Subtotal
+   367→│       ├── DeliveryFee
+   368→│       └── TotalAmount (bold)
+   369→├── StatusTimeline (visual progress)
+   370→├── StatusHistory (timeline of all status changes with timestamps and remarks)
+   371→└── UpdateStatusForm
+   372→    ├── StatusSelect (dropdown)
+   373→    ├── RemarkTextarea (optional)
+   374→    └── UpdateButton
+   375→```
+   376→
+   377→### 6.3 Update Order Status
+   378→**Flow:**
+   379→1. Admin selects new status from dropdown
+   380→2. Optionally enters remark
+   381→3. Clicks "Update Status"
+   382→4. PUT `/api/orders` with { id, status, remark }
+   383→5. Order status updated
+   384→6. New OrderStatusHistory record created
+   385→7. If status = DELIVERED: `deliveredAt` set to now
+   386→8. If status = CANCELLED: `cancelledAt` set to now
+   387→9. Toast: "Order status updated to [status]"
+   388→
+   389→**Status Transition Rules:**
+   390→```
+   391→PENDING → CONFIRMED (admin confirms)
+   392→PENDING → CANCELLED (admin or customer cancels)
+   393→CONFIRMED → PREPARING (restaurant starts cooking)
+   394→CONFIRMED → CANCELLED
+   395→PREPARING → ON_THE_WAY (out for delivery)
+   396→PREPARING → CANCELLED
+   397→ON_THE_WAY → DELIVERED (delivered)
+   398→ON_THE_WAY → CANCELLED (rare)
+   399→DELIVERED → (terminal state)
+   400→CANCELLED → (terminal state)
+   401→```
+   402→
+   403→**Invalid Transitions:**
+   404→- Cannot go backwards (e.g., PREPARING → PENDING)
+   405→- Cannot change DELIVERED or CANCELLED orders
+   406→- Show validation error if invalid transition attempted
+   407→
+   408→### 6.4 Order Status History
+   409→- Timeline display of all status changes
+   410→- Each entry: Status + Timestamp + Remark (if any) + ChangedBy (admin name or "Customer")
+   411→- Chronological order (newest first or oldest first)
+   412→
+   413→**Design:**
+   414→```
+   415→StatusTimelineEntry
+   416→├── TimelineDot (colored by status)
+   417→├── TimelineLine (connecting to next entry)
+   418→├── StatusText (bold)
+   419→├── Timestamp ("Jan 1, 2024 at 10:30 AM")
+   420→└── RemarkText (italic, gray, if present)
+   421→    └── ChangedByText ("by Admin" / "by Customer")
+   422→```
+   423→
+   424→### 6.5 Delete Order
+   425→- Only for admin
+   426→- Confirmation modal with severe warning
+   427→- Hard delete (removes order, order items, and status history)
+   428→- Warning: "This action is permanent and cannot be undone"
+   429→- Use case: Cleanup test orders, remove fraudulent orders
+   430→- Soft delete alternative: Consider adding `isDeleted` flag instead
+   431→
+   432→**Edge Cases:**
+   433→- Paid order being deleted → "This is a paid order (₦X,XXX). Are you sure?"
+   434→- Order with Paystack reference → Refund should be initiated first
+   435→- Order in PREPARING/ON_THE_WAY → Extra warning: "This order is currently being prepared/in transit"
+   436→- Bulk delete (future feature)
+   437→
+   438→---
+   439→
+   440→## 7. Customer Management
+   441→
+   442→### 7.1 Customer List
+   443→**Layout:**
+   444→- Section header: "Customers"
+   445→- Search bar (by name, email, phone)
+   446→- Filter: All, Active, Blocked
+   447→- Data table
+   448→
+   449→**Table Columns:**
+   450→| Column | Width | Content |
+   451→|--------|-------|---------|
+   452→| Avatar | 50px | User avatar (w-8 h-8, rounded-full) |
+   453→| Name | 150px | Full name |
+   454→| Email | 200px | Email (truncated) |
+   455→| Phone | 120px | Phone number |
+   456→| Orders | 80px | Order count badge |
+   457→| Total Spent | 100px | ₦ total |
+   458→| Status | 80px | Active/Blocked badge |
+   459→| Joined | 100px | Registration date |
+   460→| Actions | 100px | Edit + Block/Unblock |
+   461→
+   462→### 7.2 Customer Detail/Edit
+   463→**Layout:**
+   464→- Inline editing or modal
+   465→- Fields: Name, Phone, Address, Status
+   466→
+   467→**Admin Actions:**
+   468→- **Block User:** Sets `status: BLOCKED`, user cannot login
+   469→- **Unblock User:** Sets `status: ACTIVE`
+   470→- **View Orders:** Navigate to orders filtered by this user
+   471→- **Edit Details:** Change name, phone, address
+   472→
+   473→### 7.3 Block/Unblock Customer
+   474→**Flow:**
+   475→1. Admin clicks "Block" button
+   476→2. Confirmation modal: "Block [Name]? They will not be able to login."
+   477→3. PUT `/api/users` with { id, status: BLOCKED }
+   478→4. If user is currently logged in: Their session should be invalidated
+   479→5. Toast: "Customer blocked successfully"
+   480→
+   481→**Edge Cases:**
+   482→- Block an admin → Prevent: "Cannot block admin users"
+   483→- Unblock a blocked user → "Customer unblocked"
+   484→- User has active orders → "This customer has X active orders. Block anyway?"
+   485→
+   486→### 7.4 Delete Customer
+   487→- Confirmation modal
+   488→- Options: "Delete" vs "Block instead"
+   489→- Deleting removes user and all their orders
+   490→- Warning: "All X orders will also be permanently deleted"
+   491→- Recommendation: Block instead of delete (preserves order data)
+   492→
+   493→---
+   494→
+   495→## 8. Earnings Dashboard
+   496→
+   497→### 8.1 Total Earnings Display
+   498→**Layout:**
+   499→- Large earnings card with total revenue
+   500→- Breakdown by payment method (Paystack vs COD)
+   501→- Period selector: Today, This Week, This Month, This Year, All Time
+   502→
+   503→**Components:**
+   504→```
+   505→AdminEarnings
+   506→├── ContentHeader ("Earnings" + PeriodSelector)
+   507→├── EarningsSummary (grid, 3 columns)
+   508→│   ├── TotalEarnings (₦XXX,XXX, green trend)
+   509→│   ├── PaystackEarnings (₦XXX,XXX)
+   510→│   └── CODEarnings (₦XXX,XXX)
+   511→├── EarningsChart (bar/line chart, daily/weekly/monthly)
+   512→├── TopRestaurants (table, sorted by revenue)
+   513→│   ├── RestaurantName
+   514→│   ├── OrdersCount
+   515→│   └── Revenue
+   516→└── RecentTransactions (table, last 20 paid orders)
+   517→    ├── Date
+   518→    ├── OrderNumber
+   519→    ├── Customer
+   520→    ├── Amount
+   521→    ├── Method (Paystack/COD)
+   522→    └── Status
+   523→```
+   524→
+   525→### 8.2 Earnings Calculation
+   526→```sql
+   527→-- Total Earnings
+   528→SELECT SUM("totalAmount") FROM "orders" WHERE "paymentStatus" = 'PAID';
+   529→
+   530→-- Earnings by period
+   531→SELECT DATE("createdAt") as date, SUM("totalAmount") as revenue
+   532→FROM "orders" WHERE "paymentStatus" = 'PAID'
+   533→GROUP BY DATE("createdAt")
+   534→ORDER BY date DESC;
+   535→
+   536→-- Earnings by restaurant
+   537→SELECT r.name, COUNT(o.id) as order_count, SUM(o."totalAmount") as revenue
+   538→FROM "orders" o
+   539→JOIN "restaurants" r ON o."restaurantId" = r.id
+   540→WHERE o."paymentStatus" = 'PAID'
+   541→GROUP BY r.id, r.name
+   542→ORDER BY revenue DESC;
+   543→```
+   544→
+   545→### 8.3 Earnings Chart
+   546→- Simple bar chart showing daily revenue
+   547→- Nigerian Naira on Y-axis
+   548→- Dates on X-axis
+   549→- Use CSS-based chart or simple chart library (avoid heavy dependencies)
+   550→- Hover tooltip: Date + Revenue
+   551→
+   552→**Edge Cases:**
+   553→- No earnings in period → Show "₦0" with encouraging message
+   554→- COD orders not yet confirmed as paid → Show separately as "Pending COD"
+   555→- Refunded orders → Deduct from total, show "Refunded: ₦X,XXX"
+   556→
+   557→---
+   558→
+   559→## 9. Admin API Endpoints (Detailed)
+   560→
+   561→### 9.1 Dashboard Stats
+   562→```
+   563→GET /api/dashboard/stats
+   564→
+   565→Response:
+   566→{
+   567→  totalRestaurants: 15,
+   568→  totalFoods: 120,
+   569→  totalCustomers: 450,
+   570→  totalOrders: 1250,
+   571→  pendingOrders: 23,
+   572→  todayOrders: 15,
+   573→  totalEarnings: 2500000,  // in NGN
+   574→  cancelledOrders: 45
+   575→}
+   576→```
+   577→
+   578→### 9.2 Earnings Data
+   579→```
+   580→GET /api/dashboard/earnings?period=month
+   581→
+   582→Response:
+   583→{
+   584→  totalEarnings: 2500000,
+   585→  paystackEarnings: 1800000,
+   586→  codEarnings: 700000,
+   587→  dailyData: [
+   588→    { date: "2024-01-01", revenue: 85000, orders: 12 },
+   589→    { date: "2024-01-02", revenue: 92000, orders: 15 },
+   590→    ...
+   591→  ],
+   592→  topRestaurants: [
+   593→    { name: "Mama Put Kitchen", orders: 120, revenue: 450000 },
+   594→    ...
+   595→  ]
+   596→}
+   597→```
+   598→
+   599→### 9.3 Restaurant CRUD
+   600→```
+   601→POST /api/restaurants
+   602→Body: { name, categoryId, email, phone, address, city, state, openTime, closeTime, openDays, image }
+   603→Response: { restaurant }
+   604→
+   605→PUT /api/restaurants
+   606→Body: { id, name?, categoryId?, email?, phone?, address?, city?, state?, openTime?, closeTime?, openDays?, image?, isActive? }
+   607→Response: { restaurant }
+   608→
+   609→DELETE /api/restaurants?id=xxx
+   610→Response: { success: true }
+   611→```
+   612→
+   613→### 9.4 Category CRUD
+   614→```
+   615→POST /api/categories
+   616→Body: { name, description?, image? }
+   617→Response: { category }
+   618→
+   619→PUT /api/categories
+   620→Body: { id, name?, description?, image? }
+   621→Response: { category }
+   622→
+   623→DELETE /api/categories?id=xxx
+   624→Response: { success: true }
+   625→```
+   626→
+   627→### 9.5 Food CRUD
+   628→```
+   629→POST /api/foods
+   630→Body: { name, description?, categoryId, restaurantId, price, image?, isAvailable? }
+   631→Response: { food }
+   632→
+   633→PUT /api/foods
+   634→Body: { id, name?, description?, categoryId?, restaurantId?, price?, image?, isAvailable? }
+   635→Response: { food }
+   636→
+   637→DELETE /api/foods?id=xxx
+   638→Response: { success: true }
+   639→
+   640→GET /api/foods?categoryId=X&restaurantId=Y&search=Z&isAvailable=true
+   641→Response: { foods: [...] }
+   642→```
+   643→
+   644→### 9.6 Order Management
+   645→```
+   646→GET /api/orders?status=PENDING&search=ORD-2024&page=1
+   647→Response: { orders: [...], total, page, pageSize }
+   648→
+   649→PUT /api/orders
+   650→Body: { id, status, remark? }
+   651→Response: { order }
+   652→
+   653→DELETE /api/orders?id=xxx
+   654→Response: { success: true }
+   655→```
+   656→
+   657→### 9.7 User Management
+   658→```
+   659→GET /api/users?search=john&status=ACTIVE
+   660→Response: { users: [...] }
+   661→
+   662→PUT /api/users
+   663→Body: { id, name?, phone?, address?, status? }
+   664→Response: { user }
+   665→
+   666→DELETE /api/users?id=xxx
+   667→Response: { success: true }
+   668→```
+   669→
+   670→---
+   671→
+   672→## 10. Admin-Specific Edge Cases
+   673→
+   674→### 10.1 Concurrent Editing
+   675→- Two admins editing same restaurant/food → Last write wins
+   676→- Show "last modified" timestamp to help resolve conflicts
+   677→- Future: Optimistic locking with version field
+   678→
+   679→### 10.2 Data Integrity
+   680→- Deleting category with restaurants → Cascade delete with confirmation
+   681→- Deleting restaurant with foods → Cascade delete with confirmation
+   682→- Deleting food in active orders → Order items preserved (snapshot)
+   683→- Deleting customer with orders → Option to block instead
+   684→
+   685→### 10.3 Bulk Operations (Future)
+   686→- Bulk delete orders
+   687→- Bulk update food availability
+   688→- Export data (CSV/PDF)
+   689→- Bulk import foods from spreadsheet
+   690→
+   691→### 10.4 Admin Session
+   692→- Admin session timeout: 8 hours (longer than customer)
+   693→- Admin actions logged (audit trail)
+   694→- Only ADMIN role can access admin section
+   695→- If admin's role is changed to CUSTOMER: Immediate session invalidation
+   696→
+   697→### 10.5 Image Management
+   698→- Image upload size: Max 2MB
+   699→- Accepted formats: jpg, jpeg, png, webp
+   700→- Image dimensions: Minimum 200x200px, maximum 4000x4000px
+   701→- Orphaned images cleanup: Cron job to remove images not referenced in DB
+   702→- Default placeholder images provided for categories/restaurants/foods
+   703→
+   704→### 10.6 Nigerian Context
+   705→- All amounts in Nigerian Naira (₦)
+   706→- Nigerian states and cities in dropdowns
+   707→- Nigerian phone format validation
+   708→- Nigerian food categories and names
+   709→- Lagos, Abuja, Port Harcourt as primary cities
+   710→- Delivery fee structure for Nigerian logistics
+   711→
+   712→---
+   713→
+   714→## 11. Agentic Prompt for Admin Panel Implementation
+   715→
+   716→```
+   717→You are building the ADMIN PANEL of NaijaBites, a Nigerian food ordering web application.
+   718→
+   719→The admin panel is a SECTION within the single-page app (activeSection === 'admin'), using a separate layout with sidebar navigation.
+   720→
+   721→## Admin Layout
+   722→1. Build AdminLayout with:
+   723→   - Left sidebar (w-64, fixed, bg-orange-600, full-height)
+   724→   - Navigation items: Dashboard, Restaurants, Categories, Food Menu, Orders, Customers, Earnings
+   725→   - Logo at top, Logout at bottom
+   726→   - "Back to Store" button in content header
+   727→2. Right content area (ml-64, bg-gray-50, scrollable)
+   728→3. Active admin section managed by Zustand sub-state (adminSection)
+   729→
+   730→## Dashboard Section
+   731→1. 8 stat cards in responsive grid (Total Restaurants, Foods, Customers, Orders, Pending Orders, Today's Orders, Earnings, Cancelled Orders)
+   732→2. Each card: colored icon, title, value, trend indicator
+   733→3. Recent orders table (5 rows)
+   734→4. Simple revenue bar chart (last 7 days)
+   735→
+   736→## Restaurant Management
+   737→1. Table listing with search, category filter
+   738→2. Add form in HeroUI Modal: name, category, email, phone, address, city, state, open/close time, days, image upload, active switch
+   739→3. Edit form (same as add, pre-populated)
+   740→4. Delete with cascade warning modal
+   741→5. Nigerian cities/states dropdowns
+   742→
+   743→## Category Management
+   744→1. Card grid (3-column) with image, name, food/restaurant counts
+   745→2. Add form: name, description, image upload
+   746→3. Edit form (pre-populated)
+   747→4. Delete with cascade warning
+   748→5. Cannot delete last category
+   749→
+   750→## Food Menu Management
+   751→1. Table listing with search, category filter, restaurant filter, availability filter
+   752→2. Add form: name, description, category, restaurant (filtered by category), price (₦), image, availability switch
+   753→3. Quick availability toggle in table
+   754→4. Edit form (pre-populated)
+   755→5. Delete with confirmation
+   756→
+   757→## Order Management
+   758→1. Table with status filter tabs, search, date filter
+   759→2. Order detail view with: customer info, payment info, items table, status timeline, status history
+   760→3. Update status form: dropdown + remark textarea
+   761→4. Status transitions: PENDING→CONFIRMED→PREPARING→ON_THE_WAY→DELIVERED (or CANCELLED)
+   762→5. Prevent backward transitions and terminal state changes
+   763→6. Delete with severe warning (especially for paid orders)
+   764→
+   765→## Customer Management
+   766→1. Table with search, status filter (Active/Blocked)
+   767→2. Customer detail/edit form
+   768→3. Block/unblock with confirmation
+   769→4. Cannot block admin users
+   770→5. Delete with warning, recommend blocking instead
+   771→
+   772→## Earnings Section
+   773→1. Period selector (Today/Week/Month/Year/All Time)
+   774→2. Summary cards: Total, Paystack, COD
+   775→3. Revenue chart (daily bar chart)
+   776→4. Top restaurants table
+   777→5. Recent transactions table
+   778→
+   779→## API Endpoints (All Admin-Protected)
+   780→- GET/POST/PUT/DELETE /api/restaurants
+   781→- GET/POST/PUT/DELETE /api/categories
+   782→- GET/POST/PUT/DELETE /api/foods
+   783→- GET/PUT/DELETE /api/orders (admin can see all, update status)
+   784→- GET/PUT/DELETE /api/users
+   785→- GET /api/dashboard/stats
+   786→- GET /api/dashboard/earnings
+   787→- POST /api/upload
+   788→
+   789→## Design Requirements
+   790→- Orange sidebar (#f97316 family) with white text
+   791→- Light content area (bg-gray-50)
+   792→- HeroUI Table component for all data tables
+   793→- HeroUI Modal for forms
+   794→- Orange accent on active items
+   795→- Responsive: Sidebar collapses on mobile
+   796→- Loading states for all data
+   797→- Empty states for all lists
+   798→- Toast notifications for all CRUD operations
+   799→```
+   800→
