@@ -2,38 +2,37 @@
 
 A full-stack Nigerian food ordering web application built with Next.js 16, featuring multi-restaurant ordering, Paystack payments, and dedicated dashboards for customers, restaurant owners, and admins.
 
-![NaijaBites Home](screenshot-home.png)
+![NaijaBites Home](screenshots/home.png)
 
 ---
 
 ## 📸 Screenshots
 
-| Home Page                     | Menu Page                     |
-| ----------------------------- | ----------------------------- |
-| ![Home](screenshot-home.png) | ![Menu](screenshot-menu.png) |
+| Home Page | Menu Page |
+|-----------|-----------|
+| ![Home](screenshots/home.png) | ![Menu](screenshots/menu.png) |
 
-| Restaurants                                 | Cart & Checkout               |
-| ------------------------------------------- | ----------------------------- |
-| ![Restaurants](screenshot-restaurants.png) | ![Cart](screenshot-cart.png) |
+| Restaurants | Cart & Checkout |
+|-------------|-----------------|
+| ![Restaurants](screenshots/restaurants.png) | ![Cart](screenshots/cart.png) |
 
-| Login Modal                     | Admin Dashboard                                     |
-| ------------------------------- | --------------------------------------------------- |
-| ![Login](screenshot-login.png) | ![Admin Dashboard](screenshot-admin-dashboard.png) |
+| Login Modal | Admin Dashboard |
+|-------------|-----------------|
+| ![Login](screenshots/login.png) | ![Admin Dashboard](screenshots/admin-dashboard.png) |
 
-| Admin Orders                                  | Admin Earnings                                    |
-| --------------------------------------------- | ------------------------------------------------- |
-| ![Admin Orders](screenshot-admin-orders.png) | ![Admin Earnings](screenshot-admin-earnings.png) |
+| Admin Orders | Admin Earnings |
+|-------------|----------------|
+| ![Admin Orders](screenshots/admin-orders.png) | ![Admin Earnings](screenshots/admin-earnings.png) |
 
-| Vendor Dashboard                                      | Vendor Menu Management                      |
-| ----------------------------------------------------- | ------------------------------------------- |
-| ![Vendor Dashboard](screenshot-vendor-dashboard.png) | ![Vendor Menu](screenshot-vendor-menu.png) |
+| Vendor Dashboard | Vendor Menu Management |
+|------------------|------------------------|
+| ![Vendor Dashboard](screenshots/vendor-dashboard.png) | ![Vendor Menu](screenshots/vendor-menu.png) |
 
 ---
 
 ## ✨ Features
 
 ### 🛒 Customer Portal (`/`)
-
 - **Browse Menu** — Filter foods by category, search by name
 - **Restaurant Listings** — Discover restaurants with ratings, city, and food count
 - **Add to Cart** — Add items from multiple restaurants in one session
@@ -46,7 +45,6 @@ A full-stack Nigerian food ordering web application built with Next.js 16, featu
 - **Authentication** — Register, login, session persistence via NextAuth.js JWT
 
 ### 🏪 Restaurant Owner / Vendor Portal (`/vendor`)
-
 - **Dashboard** — Overview stats: today's orders, earnings, total menu items
 - **Order Management** — Accept/reject incoming orders, update status through the fulfillment pipeline
 - **Menu Management** — Add, edit, delete food items with Cloudinary image uploads
@@ -54,7 +52,6 @@ A full-stack Nigerian food ordering web application built with Next.js 16, featu
 - **Earnings** — Revenue breakdown with platform commission tracking
 
 ### 🔧 Admin Portal (`/admin`)
-
 - **Dashboard** — Platform-wide stats: restaurants, food items, orders, users, total earnings
 - **Restaurant Management** — Add, edit, activate/deactivate restaurants, assign owners
 - **Food Management** — Add, edit, delete any food item across all restaurants
@@ -65,7 +62,6 @@ A full-stack Nigerian food ordering web application built with Next.js 16, featu
 - **Earnings Report** — Paystack vs COD breakdown, daily revenue chart, top restaurants by earnings
 
 ### 💳 Payment Flow (Paystack)
-
 1. Customer selects **Paystack** at checkout
 2. Order is created in the database with `paymentStatus: PENDING`
 3. Backend calls Paystack `transaction/initialize` with `callback_url`
@@ -80,23 +76,21 @@ A full-stack Nigerian food ordering web application built with Next.js 16, featu
 ## 🏗️ Architecture
 
 ### Tech Stack
-
-| Layer                | Technology                                          |
-| -------------------- | --------------------------------------------------- |
-| **Framework**        | Next.js 16 (App Router, Turbopack)                  |
-| **Language**         | TypeScript 5                                        |
-| **Styling**          | Tailwind CSS 4 + shadcn/ui                          |
-| **Database**         | SQLite via Prisma ORM                               |
-| **Authentication**   | NextAuth.js v4 (Credentials, JWT strategy)          |
-| **State Management** | Zustand (cart, UI) + TanStack Query (server state)  |
-| **Payments**         | Paystack (initialize → redirect → verify → webhook) |
-| **Image Storage**    | Cloudinary (via next-cloudinary)                    |
-| **Animations**       | Framer Motion                                       |
-| **Notifications**    | react-hot-toast                                     |
-| **Icons**            | Lucide React                                        |
+| Layer | Technology |
+|-------|-----------|
+| **Framework** | Next.js 16 (App Router, Turbopack) |
+| **Language** | TypeScript 5 |
+| **Styling** | Tailwind CSS 4 + shadcn/ui |
+| **Database** | SQLite via Prisma ORM |
+| **Authentication** | NextAuth.js v4 (Credentials, JWT strategy) |
+| **State Management** | Zustand (cart, UI) + TanStack Query (server state) |
+| **Payments** | Paystack (initialize → redirect → verify → webhook) |
+| **Image Storage** | Cloudinary (via next-cloudinary) |
+| **Animations** | Framer Motion |
+| **Notifications** | react-hot-toast |
+| **Icons** | Lucide React |
 
 ### Route Structure
-
 ```
 src/app/
 ├── (customer)/          # Customer-facing pages
@@ -139,7 +133,6 @@ src/app/
 ```
 
 ### Database Schema
-
 ```
 User ─┬─< Order ─< SubOrder ─┬─< OrderItem >─ Food
       │                      └─< SubOrderStatusHistory
@@ -151,7 +144,6 @@ Category ─┬─< Restaurant
 ```
 
 **Key Design Decisions:**
-
 - **SubOrders** — When a customer orders from multiple restaurants, the parent `Order` splits into `SubOrder`s per restaurant (like Glovo/Chowdeck). Each restaurant only sees and manages their own sub-order.
 - **Dual Payment Confirmation** — Payment is verified both on the callback page (client-initiated) and via Paystack webhooks (server-push), ensuring no payment is missed.
 - **Commission Tracking** — Each `SubOrder` records `commissionRate`, `commissionAmount`, and `restaurantEarnings` for transparent revenue splitting.
@@ -161,12 +153,10 @@ Category ─┬─< Restaurant
 ## 🚀 Getting Started
 
 ### Prerequisites
-
 - **Node.js** 18+ or **Bun** runtime
 - **Git**
 
 ### 1. Clone & Install
-
 ```bash
 git clone <your-repo-url>
 cd online_food_ordering
@@ -174,15 +164,12 @@ bun install
 ```
 
 ### 2. Environment Setup
-
 Copy the example env file and fill in your keys:
-
 ```bash
 cp .env.example .env
 ```
 
 Edit `.env` with your configuration:
-
 ```env
 # Database (SQLite — zero config)
 DATABASE_URL=file:./db/custom.db
@@ -209,7 +196,6 @@ NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY=pk_test_xxxxx
 > **💡 Without Cloudinary keys**: Image uploads will fail silently. Add your Cloudinary credentials to enable restaurant/food image uploads.
 
 ### 3. Database Setup
-
 ```bash
 # Push schema to SQLite database
 bun run db:push
@@ -222,7 +208,6 @@ bun run db:seed
 ```
 
 ### 4. Run the App
-
 ```bash
 bun run dev
 ```
@@ -231,11 +216,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### 5. Default Login Credentials
 
-| Role                 | Email                     | Password |
-| -------------------- | ------------------------- | -------- |
-| **Admin**            | admin@naijabites.ng       | admin123 |
-| **Restaurant Owner** | (created via admin panel) | —        |
-| **Customer**         | (register via UI)         | —        |
+| Role | Email | Password |
+|------|-------|----------|
+| **Admin** | admin@naijabites.ng | admin123 |
+| **Restaurant Owner** | (created via admin panel) | — |
+| **Customer** | (register via UI) | — |
 
 ---
 
@@ -244,11 +229,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 For Paystack to redirect back to your local machine after payment, you need to expose your localhost:
 
 1. **Using ngrok** (recommended):
-
    ```bash
    ngrok http 3000
    ```
-
    Then set `NEXT_PUBLIC_APP_URL` to your ngrok URL (e.g., `https://abc123.ngrok.io`)
 
 2. **Using Paystack Test Mode**: Use Paystack test keys (`sk_test_...` / `pk_test_...`) and test cards from [Paystack's documentation](https://paystack.com/docs/testing/)
@@ -301,42 +284,42 @@ src/
 
 ## 🔑 Key API Endpoints
 
-| Method       | Endpoint                   | Description                             |
-| ------------ | -------------------------- | --------------------------------------- |
-| `POST`       | `/api/auth/register`       | Register new customer                   |
-| `POST`       | `/api/auth/[...nextauth]`  | Login / session                         |
-| `GET`        | `/api/categories`          | List categories with counts             |
-| `GET/POST`   | `/api/foods`               | List / create foods                     |
-| `PUT/DELETE` | `/api/foods`               | Update / delete food                    |
-| `GET/POST`   | `/api/restaurants`         | List / create restaurants               |
-| `PUT`        | `/api/restaurants`         | Update restaurant                       |
-| `POST`       | `/api/orders`              | Create order (with sub-order splitting) |
-| `GET/PUT`    | `/api/orders`              | List / update orders                    |
-| `GET`        | `/api/profile`             | Get user profile                        |
-| `PUT`        | `/api/profile`             | Update user profile                     |
-| `GET`        | `/api/users`               | List users (admin)                      |
-| `POST`       | `/api/upload`              | Upload image to Cloudinary              |
-| `GET`        | `/api/dashboard/stats`     | Dashboard statistics                    |
-| `GET`        | `/api/dashboard/earnings`  | Earnings data                           |
-| `POST`       | `/api/paystack/initialize` | Initialize Paystack payment             |
-| `GET`        | `/api/paystack/verify`     | Verify Paystack payment                 |
-| `POST`       | `/api/paystack/webhook`    | Paystack webhook handler                |
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/auth/register` | Register new customer |
+| `POST` | `/api/auth/[...nextauth]` | Login / session |
+| `GET` | `/api/categories` | List categories with counts |
+| `GET/POST` | `/api/foods` | List / create foods |
+| `PUT/DELETE` | `/api/foods` | Update / delete food |
+| `GET/POST` | `/api/restaurants` | List / create restaurants |
+| `PUT` | `/api/restaurants` | Update restaurant |
+| `POST` | `/api/orders` | Create order (with sub-order splitting) |
+| `GET/PUT` | `/api/orders` | List / update orders |
+| `GET` | `/api/profile` | Get user profile |
+| `PUT` | `/api/profile` | Update user profile |
+| `GET` | `/api/users` | List users (admin) |
+| `POST` | `/api/upload` | Upload image to Cloudinary |
+| `GET` | `/api/dashboard/stats` | Dashboard statistics |
+| `GET` | `/api/dashboard/earnings` | Earnings data |
+| `POST` | `/api/paystack/initialize` | Initialize Paystack payment |
+| `GET` | `/api/paystack/verify` | Verify Paystack payment |
+| `POST` | `/api/paystack/webhook` | Paystack webhook handler |
 
 ---
 
 ## 🛠️ Scripts
 
-| Command               | Description                           |
-| --------------------- | ------------------------------------- |
-| `bun run dev`         | Start development server on port 3000 |
-| `bun run lint`        | Run ESLint                            |
-| `bun run db:push`     | Push Prisma schema to database        |
-| `bun run db:generate` | Generate Prisma client                |
-| `bun run db:migrate`  | Run Prisma migrations                 |
-| `bun run db:reset`    | Reset database (⚠️ deletes all data)  |
-| `bun run db:seed`     | Seed database with sample data        |
-| `bun run build`       | Build for production                  |
-| `bun run start`       | Start production server               |
+| Command | Description |
+|---------|-------------|
+| `bun run dev` | Start development server on port 3000 |
+| `bun run lint` | Run ESLint |
+| `bun run db:push` | Push Prisma schema to database |
+| `bun run db:generate` | Generate Prisma client |
+| `bun run db:migrate` | Run Prisma migrations |
+| `bun run db:reset` | Reset database (⚠️ deletes all data) |
+| `bun run db:seed` | Seed database with sample data |
+| `bun run build` | Build for production |
+| `bun run start` | Start production server |
 
 ---
 
